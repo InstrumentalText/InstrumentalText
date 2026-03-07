@@ -72,17 +72,6 @@ public class GeneralHandler : MonoBehaviour, IActionHandler
         return actionType == "transform.modify";
     }
 
-    private Vector3? ParseVector3(JToken token)
-    {
-        if (token == null || token.Type != JTokenType.Object) return null;
-        var obj = (JObject)token;
-        return new Vector3(
-            obj["x"]?.Value<float>() ?? 0f,
-            obj["y"]?.Value<float>() ?? 0f,
-            obj["z"]?.Value<float>() ?? 0f
-        );
-    }
-
     public ActionResult Execute(string actionType, string argsJson, ExecutionContext target)
     {
         var spec = actionSpecs.Find(s => s.type == actionType);
@@ -95,6 +84,17 @@ public class GeneralHandler : MonoBehaviour, IActionHandler
         try { argsObj = JObject.Parse(argsJson ?? "{}");}
         catch (Exception e) {return new ActionResult{success = false, errorCode = "INVALID_JSON", message = e.Message};}
 
+        switch(spec.type)
+        {
+            case "transform.modify":
+                return HandleTransformModify(spec, argsObj, target);
+            default:
+                return new ActionResult{success = false, errorCode = "UNKNOWN_ACTION", message = $"Unsupported action: {actionType}"};
+        }
+    }
+
+    private ActionResult HandleTransformModify(ActionSpec spec, JObject argsObj, ExecutionContext target)
+    {
         foreach(var arg in spec.args)
         {
             var token = argsObj[arg.name];
@@ -163,5 +163,16 @@ public class GeneralHandler : MonoBehaviour, IActionHandler
         }
 
         return new ActionResult{success = true, errorCode = "", message = ""};
+    }
+
+    private Vector3? ParseVector3(JToken token)
+    {
+        if (token == null || token.Type != JTokenType.Object) return null;
+        var obj = (JObject)token;
+        return new Vector3(
+            obj["x"]?.Value<float>() ?? 0f,
+            obj["y"]?.Value<float>() ?? 0f,
+            obj["z"]?.Value<float>() ?? 0f
+        );
     }
 }
