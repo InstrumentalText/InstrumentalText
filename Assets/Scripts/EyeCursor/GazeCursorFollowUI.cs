@@ -9,8 +9,8 @@ public class GazeCursorFollowUI : MonoBehaviour
     public XRGazeInteractor gazeInteractor;
 
     [Header("Placement")]
-    public float defaultDistance = 0.5f;        // 命中物体之前的默认距离
-    public float surfaceOffset = 0.01f;         // 安全偏移，保证 cursor 在表面前
+    public float defaultDistance = 0.5f;       
+    public float surfaceOffset = 0.01f;         
     [Header("Visual Size")]
     public float referenceDistance = 0.5f;
     public float referenceScale = 0.01f;
@@ -50,12 +50,10 @@ public class GazeCursorFollowUI : MonoBehaviour
         // 始终面向摄像机
         transform.forward = cam.forward;
 
-        // 保持恒定角度大小
         float distance = Vector3.Distance(cam.position, targetPosition);
         float scale = (distance / referenceDistance) * referenceScale;
         transform.localScale = Vector3.one * scale;
 
-        // 更新高亮
         if (gazeHighlighter != null)
         {
             gazeHighlighter.UpdateGaze(gazedObject);

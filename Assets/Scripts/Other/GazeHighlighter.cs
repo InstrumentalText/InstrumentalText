@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class GazeHighlighter : MonoBehaviour
 {
-    public float gazeThreshold = 0.3f; // 注视阈值时间
+    public float gazeThreshold = 0.3f; 
     public Color highlightColor = Color.yellow;
 
     private Transform currentGazedObject;
