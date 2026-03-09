@@ -15,6 +15,7 @@
     "com.unity.xr.interaction.toolkit": "3.3.1",
     "com.unity.xr.management": "4.5.4",
     "com.unity.xr.openxr": "1.16.1",
+    "com.unity.xr.openxr.picoxr": "file:D:/unity_project/unity_sdk/Unity OpenXR IntegrationSDK-1.4.0-20250407",
     "com.unity.modules.accessibility": "1.0.0",
     "com.unity.modules.adaptiveperformance": "1.0.0",
     "com.unity.modules.ai": "1.0.0",
