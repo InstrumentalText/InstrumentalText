@@ -7,21 +7,16 @@ using System.Text;
 
 public class LLMProcessor : MonoBehaviour
 {
-    public enum LLMProvider
-    {
-        OpenAI,
-        DeepSeek
-    }
+    [SerializeField] private TriggerSystem triggerSystem;
+    [SerializeField] private ConditionSystem conditionSystem;
 
-    [Header("LLM Provider")]
-    public LLMProvider provider = LLMProvider.DeepSeek;
+    private string m_OpenaiAPIKey;
 
-    private string apiKey;
-    private string endpoint;
-    private string model;
+    private const string k_OpenaiEndpoint = "https://api.openai.com/v1/chat/completions";
+    private const string k_Model = "gpt-4o";
 
     private const string k_PlannerPrompt =
-        @"You are an action planner for a Unity game. The user will describe what they want to do, and you will be given a list of available actions with their parameters.
+        @"You are an action planner for a Unity game. The user will describe what they want to do, and you will be given a list of available actions and conditions.
 
         Your job is to output a JSON array of trigger entries that fulfills the user's intent.
 
@@ -40,26 +35,11 @@ public class LLMProcessor : MonoBehaviour
 
     void Start()
     {
-        // Provider configuration
-        if (provider == LLMProvider.DeepSeek)
+        m_OpenaiAPIKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        if (string.IsNullOrEmpty(m_OpenaiAPIKey))
         {
-            endpoint = "https://api.deepseek.com/v1/chat/completions";
-            model = "deepseek-chat";
-            apiKey = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
+            Debug.LogError("[LLMProcessor] OPENAI_API_KEY environment variable is not set.");
         }
-        else
-        {
-            endpoint = "https://api.openai.com/v1/chat/completions";
-            model = "gpt-4o";
-            apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-        }
-
-        if (string.IsNullOrEmpty(apiKey))
-        {
-            Debug.LogError("[LLMProcessor] API key environment variable is not set.");
-        }
-
-        Debug.Log($"[LLMProcessor] Provider: {provider}, Model: {model}");
     }
 
     public void ProcessPrompt(GameObject obj, string userIntent)
@@ -72,15 +52,17 @@ public class LLMProcessor : MonoBehaviour
             return;
         }
 
-        string userMessage = $"User intent: {userIntent}\n\nAvailable actions:\n{handlersDescription}";
-        StartCoroutine(SendLLMRequest(obj, userMessage));
+        string conditionsDescription = conditionSystem.GetFormattedSpecs();
+
+        string userMessage = $"User intent: {userIntent}\n\nAvailable actions:\n{handlersDescription}\n\n{conditionsDescription}";
+        StartCoroutine(SendOpenAIRequest(obj, userMessage));
     }
 
-    private IEnumerator SendLLMRequest(GameObject obj, string userMessage)
+    private IEnumerator SendOpenAIRequest(GameObject obj, string userMessage)
     {
         var requestBody = new JObject
         {
-            ["model"] = model,
+            ["model"] = k_Model,
             ["messages"] = new JArray
             {
                 new JObject { ["role"] = "system", ["content"] = k_PlannerPrompt },
@@ -91,27 +73,24 @@ public class LLMProcessor : MonoBehaviour
 
         byte[] bodyRaw = Encoding.UTF8.GetBytes(requestBody.ToString());
 
-        using var request = new UnityWebRequest(endpoint, "POST");
+        using var request = new UnityWebRequest(k_OpenaiEndpoint, "POST");
         request.uploadHandler = new UploadHandlerRaw(bodyRaw);
         request.downloadHandler = new DownloadHandlerBuffer();
-
         request.SetRequestHeader("Content-Type", "application/json");
-        request.SetRequestHeader("Authorization", $"Bearer {apiKey}");
+        request.SetRequestHeader("Authorization", $"Bearer {m_OpenaiAPIKey}");
 
         yield return request.SendWebRequest();
 
         if (request.result != UnityWebRequest.Result.Success)
         {
-            Debug.LogError($"[LLMProcessor] API request failed: {request.error}\n{request.downloadHandler.text}");
+            Debug.LogError($"[LLMProcessor] OpenAI request failed: {request.error}\n{request.downloadHandler.text}");
             yield break;
         }
 
         string responseText = request.downloadHandler.text;
         Debug.Log($"[LLMProcessor] Raw response: {responseText}");
 
-        // Extract assistant message
-        string actionJson;
-
+        string contentJson;
         try
         {
             var response = JObject.Parse(responseText);
@@ -119,17 +98,18 @@ public class LLMProcessor : MonoBehaviour
         }
         catch (Exception e)
         {
-            Debug.LogError($"[LLMProcessor] Failed to parse response: {e.Message}");
+            Debug.LogError($"[LLMProcessor] Failed to parse OpenAI response: {e.Message}");
             yield break;
         }
 
         if (string.IsNullOrEmpty(contentJson))
         {
-            Debug.LogError("[LLMProcessor] Empty response from LLM.");
+            Debug.LogError("[LLMProcessor] Empty response from OpenAI.");
             yield break;
         }
 
-        actionJson = ExtractJson(actionJson);
+        contentJson = ExtractJson(contentJson);
+        Debug.Log($"[LLMProcessor] Extracted JSON: {contentJson}");
 
         // Check for error response
         if (contentJson.TrimStart().StartsWith("{"))
@@ -147,17 +127,41 @@ public class LLMProcessor : MonoBehaviour
             catch { }
         }
 
-        // Check planner error
+        RegisterTriggers(obj, contentJson);
+    }
+
+    /// <summary>
+    /// Extract JSON content (array or object) from markdown-wrapped text.
+    /// </summary>
+    private string ExtractJson(string text)
+    {
+        int arrayStart = text.IndexOf('[');
+        int objStart = text.IndexOf('{');
+
+        // Pick whichever comes first: array or object
+        bool isArray = arrayStart >= 0 && (objStart < 0 || arrayStart < objStart);
+
+        if (isArray)
+        {
+            int end = text.LastIndexOf(']');
+            return text.Substring(arrayStart, end - arrayStart + 1);
+        }
+        else
+        {
+            int end = text.LastIndexOf('}');
+            return text.Substring(objStart, end - objStart + 1);
+        }
+    }
+
+    /// <summary>
+    /// Unregister all previous triggers on this target, then register new ones.
+    /// </summary>
+    private void RegisterTriggers(GameObject target, string json)
+    {
+        JArray entries;
         try
         {
-            var parsed = JObject.Parse(actionJson);
-
-            if (parsed["error"] != null)
-            {
-                string reason = parsed["reason"]?.ToString() ?? "Unknown reason";
-                Debug.LogWarning($"[LLMProcessor] Planner error: {reason}");
-                yield break;
-            }
+            entries = JArray.Parse(json);
         }
         catch (Exception e)
         {
@@ -183,7 +187,6 @@ public class LLMProcessor : MonoBehaviour
     private string PrintHandlers(GameObject obj)
     {
         var handlers = obj.GetComponents<IActionHandler>();
-
         if (handlers.Length == 0)
         {
             Debug.Log($"[LLMProcessor] '{obj.name}' has no IActionHandler.");
@@ -191,13 +194,11 @@ public class LLMProcessor : MonoBehaviour
         }
 
         var sb = new StringBuilder();
-
-        sb.AppendLine($"[ActionDebugger] '{obj.name}' — {handlers.Length} handler(s):");
+        sb.AppendLine($"'{obj.name}' — {handlers.Length} handler(s):");
 
         foreach (var handler in handlers)
         {
             var specs = handler.GetActionSpecs();
-
             sb.AppendLine($"  Handler: {handler.GetType().Name} ({specs.Count} action(s))");
 
             foreach (var spec in specs)
@@ -209,14 +210,12 @@ public class LLMProcessor : MonoBehaviour
                 {
                     string req = arg.required ? "required" : "optional";
                     string def = arg.defaultValue != null ? $", default={arg.defaultValue}" : "";
-
                     sb.AppendLine($"      - {arg.name} ({arg.argType}, {req}{def}): {arg.description}");
                 }
 
                 if (spec.examples.Count > 0)
                 {
                     sb.AppendLine($"      Examples:");
-
                     foreach (var ex in spec.examples)
                         sb.AppendLine($"        {ex}");
                 }
@@ -224,50 +223,5 @@ public class LLMProcessor : MonoBehaviour
         }
 
         return sb.ToString();
-    }
-
-    private void ExecuteJson(GameObject obj, string json)
-    {
-        JObject root;
-
-        try
-        {
-            root = JObject.Parse(json);
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"[ActionDebugger] Invalid JSON: {e.Message}");
-            return;
-        }
-
-        string actionType = root["type"]?.ToString();
-
-        if (string.IsNullOrEmpty(actionType))
-        {
-            Debug.LogError("[ActionDebugger] JSON missing 'type' field.");
-            return;
-        }
-
-        string argsJson = root["args"]?.ToString() ?? "{}";
-
-        var context = new ExecutionContext(obj);
-        var handlers = obj.GetComponents<IActionHandler>();
-
-        foreach (var handler in handlers)
-        {
-            if (!handler.CanHandle(actionType))
-                continue;
-
-            var result = handler.Execute(actionType, argsJson, context);
-
-            if (result.success)
-                Debug.Log($"[ActionDebugger] '{obj.name}' -> {actionType} executed successfully.");
-            else
-                Debug.LogWarning($"[ActionDebugger] '{obj.name}' -> {actionType} failed: [{result.errorCode}] {result.message}");
-
-            return;
-        }
-
-        Debug.LogWarning($"[ActionDebugger] '{obj.name}' has no handler for '{actionType}'.");
     }
 }
