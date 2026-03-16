@@ -38,6 +38,17 @@ public class LightHandler : MonoBehaviour, IActionHandler
         },
         new ActionSpec
         {
+            type = "light.toggle",
+            summary = "Toggle the light on/off",
+            description = "Flip the current light state: if on, turn off; if off, turn on.",
+            args = new List<ArgSpec>(),
+            examples = new List<string>
+            {
+                "{\"type\":\"light.toggle\",\"args\":{}}"
+            }
+        },
+        new ActionSpec
+        {
             type = "light.intensity",
             summary = "Adjust light intensity",
             description = "Set or offset the light intensity value.",
@@ -76,7 +87,7 @@ public class LightHandler : MonoBehaviour, IActionHandler
 
     public bool CanHandle(string actionType)
     {
-        return actionType == "light.on" || actionType == "light.off" || actionType == "light.intensity";
+        return actionType == "light.on" || actionType == "light.off" || actionType == "light.toggle" || actionType == "light.intensity";
     }
 
     public ActionResult Execute(string actionType, string argsJson, ExecutionContext target)
@@ -96,6 +107,8 @@ public class LightHandler : MonoBehaviour, IActionHandler
                 return HandleLightOn();
             case "light.off":
                 return HandleLightOff();
+            case "light.toggle":
+                return HandleLightToggle();
             case "light.intensity":
                 return HandleLightIntensity(argsObj);
             default:
@@ -125,6 +138,16 @@ public class LightHandler : MonoBehaviour, IActionHandler
             return new ActionResult{success = true, errorCode = "", message = "Light is already off."};
 
         lightComponent.enabled = false;
+        UpdateBulbEmission();
+        return new ActionResult{success = true, errorCode = "", message = ""};
+    }
+
+    private ActionResult HandleLightToggle()
+    {
+        if (lightComponent == null)
+            return new ActionResult{success = false, errorCode = "NO_LIGHT", message = "Light component not found."};
+
+        lightComponent.enabled = !lightComponent.enabled;
         UpdateBulbEmission();
         return new ActionResult{success = true, errorCode = "", message = ""};
     }
