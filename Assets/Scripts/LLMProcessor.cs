@@ -7,22 +7,31 @@ using System.Text;
 
 public class LLMProcessor : MonoBehaviour
 {
+    [SerializeField] private TriggerSystem triggerSystem;
+    [SerializeField] private ConditionSystem conditionSystem;
+
     private string m_OpenaiAPIKey;
 
     private const string k_OpenaiEndpoint = "https://api.openai.com/v1/chat/completions";
     private const string k_Model = "gpt-4o";
 
-    private const string k_PlannerPrompt = 
-        @"You are an action planner for a Unity game. The user will describe what they want to do, and you will be given a list of available actions with their parameters.
+    private const string k_PlannerPrompt =
+        @"You are an action planner for a Unity game. The user will describe what they want to do, and you will be given a list of available actions and conditions.
 
-        Your job is to output a JSON action object that fulfills the user's intent.
+        Your job is to output a JSON array of trigger entries that fulfills the user's intent.
+
+        Each trigger entry has:
+        - ""condition"" (optional): { ""type"": ""..."", ""args"": {} }
+          If omitted, defaults to immediate execution (temporal.once with delay=0).
+        - ""action"" (required): { ""type"": ""..."", ""args"": {} }
 
         Rules:
         1. Output ONLY valid JSON, no extra text or explanation.
-        2. The JSON must have a ""type"" field matching one of the available action types.
-        3. The JSON must have an ""args"" object containing the required parameters.
-        4. Use default values for optional parameters unless the user specifies otherwise.
-        5. If the user's intent cannot be fulfilled by any available action, output: {""error"": true, ""reason"": ""<explanation of why no action matched and what actions are available>""}";
+        2. The output must be a JSON array, even if there is only one entry.
+        3. Each action ""type"" must match one of the available action types.
+        4. Each condition ""type"" must match one of the available condition types.
+        5. Use default values for optional parameters unless the user specifies otherwise.
+        6. If the user's intent cannot be fulfilled, output: {""error"": true, ""reason"": ""<explanation>""}";
 
     void Start()
     {
@@ -43,7 +52,9 @@ public class LLMProcessor : MonoBehaviour
             return;
         }
 
-        string userMessage = $"User intent: {userIntent}\n\nAvailable actions:\n{handlersDescription}";
+        string conditionsDescription = conditionSystem.GetFormattedSpecs();
+
+        string userMessage = $"User intent: {userIntent}\n\nAvailable actions:\n{handlersDescription}\n\n{conditionsDescription}";
         StartCoroutine(SendOpenAIRequest(obj, userMessage));
     }
 
@@ -79,12 +90,11 @@ public class LLMProcessor : MonoBehaviour
         string responseText = request.downloadHandler.text;
         Debug.Log($"[LLMProcessor] Raw response: {responseText}");
 
-        // Extract the assistant's message content
-        string actionJson;
+        string contentJson;
         try
         {
             var response = JObject.Parse(responseText);
-            actionJson = response["choices"]?[0]?["message"]?["content"]?.ToString();
+            contentJson = response["choices"]?[0]?["message"]?["content"]?.ToString();
         }
         catch (Exception e)
         {
@@ -92,42 +102,86 @@ public class LLMProcessor : MonoBehaviour
             yield break;
         }
 
-        if (string.IsNullOrEmpty(actionJson))
+        if (string.IsNullOrEmpty(contentJson))
         {
             Debug.LogError("[LLMProcessor] Empty response from OpenAI.");
             yield break;
         }
 
-        actionJson = ExtractJson(actionJson); // Response will be in markdown format
+        contentJson = ExtractJson(contentJson);
+        Debug.Log($"[LLMProcessor] Extracted JSON: {contentJson}");
 
-        Debug.Log($"[LLMProcessor] Action JSON: {actionJson}");
+        // Check for error response
+        if (contentJson.TrimStart().StartsWith("{"))
+        {
+            try
+            {
+                var parsed = JObject.Parse(contentJson);
+                if (parsed["error"] != null)
+                {
+                    string reason = parsed["reason"]?.ToString() ?? "Unknown reason";
+                    Debug.LogWarning($"[LLMProcessor] Planner error: {reason}");
+                    yield break;
+                }
+            }
+            catch { }
+        }
 
-        // Check for error response from the planner
+        RegisterTriggers(obj, contentJson);
+    }
+
+    /// <summary>
+    /// Extract JSON content (array or object) from markdown-wrapped text.
+    /// </summary>
+    private string ExtractJson(string text)
+    {
+        int arrayStart = text.IndexOf('[');
+        int objStart = text.IndexOf('{');
+
+        // Pick whichever comes first: array or object
+        bool isArray = arrayStart >= 0 && (objStart < 0 || arrayStart < objStart);
+
+        if (isArray)
+        {
+            int end = text.LastIndexOf(']');
+            return text.Substring(arrayStart, end - arrayStart + 1);
+        }
+        else
+        {
+            int end = text.LastIndexOf('}');
+            return text.Substring(objStart, end - objStart + 1);
+        }
+    }
+
+    /// <summary>
+    /// Unregister all previous triggers on this target, then register new ones.
+    /// </summary>
+    private void RegisterTriggers(GameObject target, string json)
+    {
+        JArray entries;
         try
         {
-            var parsed = JObject.Parse(actionJson);
-            if (parsed["error"] != null)
-            {
-                string reason = parsed["reason"]?.ToString() ?? "Unknown reason";
-                Debug.LogWarning($"[LLMProcessor] Planner error: {reason}");
-                yield break;
-            }
+            entries = JArray.Parse(json);
         }
         catch (Exception e)
         {
-            Debug.LogError($"[LLMProcessor] LLM returned invalid JSON: {actionJson}");
-            Debug.LogError($"[LLMProcessor] Exception {e.Message}");
-            yield break;
+            Debug.LogError($"[LLMProcessor] Failed to parse trigger array: {e.Message}");
+            return;
         }
 
-        ExecuteJson(obj, actionJson);
-    }
+        // Unregister all previous triggers for this target
+        triggerSystem.UnregisterByTarget(target);
 
-    private string ExtractJson(string text)
-    {
-        int start = text.IndexOf('{');
-        int end = text.LastIndexOf('}');
-        return text.Substring(start, end - start + 1);
+        int registered = 0;
+        foreach (var token in entries)
+        {
+            string entryJson = token.ToString();
+            int id = triggerSystem.Register(entryJson, target);
+            if (id >= 0)
+                registered++;
+        }
+
+        Debug.Log($"[LLMProcessor] Registered {registered}/{entries.Count} trigger(s) on '{target.name}'");
     }
 
     private string PrintHandlers(GameObject obj)
@@ -135,12 +189,12 @@ public class LLMProcessor : MonoBehaviour
         var handlers = obj.GetComponents<IActionHandler>();
         if (handlers.Length == 0)
         {
-            Debug.Log($"[ActionDebugger] '{obj.name}' has no IActionHandler.");
+            Debug.Log($"[LLMProcessor] '{obj.name}' has no IActionHandler.");
             return "";
         }
 
         var sb = new StringBuilder();
-        sb.AppendLine($"[ActionDebugger] '{obj.name}' — {handlers.Length} handler(s):");
+        sb.AppendLine($"'{obj.name}' — {handlers.Length} handler(s):");
 
         foreach (var handler in handlers)
         {
@@ -169,41 +223,5 @@ public class LLMProcessor : MonoBehaviour
         }
 
         return sb.ToString();
-    }
-
-    private void ExecuteJson(GameObject obj, string json)
-    {
-        JObject root;
-        try { root = JObject.Parse(json); }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"[ActionDebugger] Invalid JSON: {e.Message}");
-            return;
-        }
-
-        string actionType = root["type"]?.ToString();
-        if (string.IsNullOrEmpty(actionType))
-        {
-            Debug.LogError("[ActionDebugger] JSON missing 'type' field.");
-            return;
-        }
-
-        string argsJson = root["args"]?.ToString() ?? "{}";
-        var context = new ExecutionContext(obj);
-        var handlers = obj.GetComponents<IActionHandler>();
-
-        foreach (var handler in handlers)
-        {
-            if (!handler.CanHandle(actionType)) continue;
-
-            var result = handler.Execute(actionType, argsJson, context);
-            if (result.success)
-                Debug.Log($"[ActionDebugger] '{obj.name}' -> {actionType} executed successfully.");
-            else
-                Debug.LogWarning($"[ActionDebugger] '{obj.name}' -> {actionType} failed: [{result.errorCode}] {result.message}");
-            return;
-        }
-
-        Debug.LogWarning($"[ActionDebugger] '{obj.name}' has no handler for '{actionType}'.");
     }
 }
