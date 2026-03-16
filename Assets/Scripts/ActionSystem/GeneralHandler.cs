@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Newtonsoft.Json.Linq;
-using System.Runtime.CompilerServices;
 
 public class GeneralHandler : MonoBehaviour, IActionHandler
 {
@@ -59,6 +58,35 @@ public class GeneralHandler : MonoBehaviour, IActionHandler
             {
                 "{\"type\":\"transform.modify\",\"args\":{\"mode\":\"relative\",\"space\":\"world\",\"position\":{\"x\":0,\"y\":0.1,\"z\":0}}}"
             }
+        },
+
+        // ============================
+        // NEW ACTION: MATERIAL COLOR
+        // ============================
+
+        new ActionSpec
+        {
+            type = "material.set_color",
+            summary = "Change object color",
+            description = "Set the object's material color to a predefined color.",
+            args = new List<ArgSpec>
+            {
+                new ArgSpec
+                {
+                    name = "color",
+                    argType = "enum",
+                    required = true,
+                    description = "Predefined color name.",
+                    constraints = new ArgConstraints
+                    {
+                        enumValues = new List<string>{ "red", "green", "yellow", "blue", "white" }
+                    }
+                }
+            },
+            examples = new List<string>
+            {
+                "{\"type\":\"material.set_color\",\"args\":{\"color\":\"red\"}}"
+            }
         }
     };
 
@@ -69,29 +97,80 @@ public class GeneralHandler : MonoBehaviour, IActionHandler
 
     public bool CanHandle(string actionType)
     {
-        return actionType == "transform.modify";
+        return actionType == "transform.modify" || actionType == "material.set_color";
     }
 
     public ActionResult Execute(string actionType, string argsJson, ExecutionContext target)
     {
         var spec = actionSpecs.Find(s => s.type == actionType);
-        if (spec == null) return new ActionResult{success = false, errorCode = "UNKNOWN_ACTION", message = $"Unsupported action: {actionType}"};
 
-        if(target == null || target.Target == null) return new ActionResult{success = false, errorCode = "INVALID_TARGET", message = $"Target is null"};
+        if (spec == null)
+            return new ActionResult{success = false, errorCode = "UNKNOWN_ACTION", message = $"Unsupported action: {actionType}"};
 
+        if(target == null || target.Target == null)
+            return new ActionResult{success = false, errorCode = "INVALID_TARGET", message = $"Target is null"};
 
         JObject argsObj;
-        try { argsObj = JObject.Parse(argsJson ?? "{}");}
-        catch (Exception e) {return new ActionResult{success = false, errorCode = "INVALID_JSON", message = e.Message};}
+
+        try
+        {
+            argsObj = JObject.Parse(argsJson ?? "{}");
+        }
+        catch (Exception e)
+        {
+            return new ActionResult{success = false, errorCode = "INVALID_JSON", message = e.Message};
+        }
 
         switch(spec.type)
         {
             case "transform.modify":
                 return HandleTransformModify(spec, argsObj, target);
+
+            case "material.set_color":
+                return HandleSetColor(spec, argsObj, target);
+
             default:
                 return new ActionResult{success = false, errorCode = "UNKNOWN_ACTION", message = $"Unsupported action: {actionType}"};
         }
     }
+
+    // ============================
+    // COLOR HANDLER
+    // ============================
+
+    private ActionResult HandleSetColor(ActionSpec spec, JObject argsObj, ExecutionContext target)
+    {
+        string colorName = argsObj["color"]?.ToString();
+
+        if (string.IsNullOrEmpty(colorName))
+            return new ActionResult{success = false, errorCode = "MISSING_ARG", message = "Missing color argument"};
+
+        Color color;
+
+        switch(colorName)
+        {
+            case "red": color = Color.red; break;
+            case "green": color = Color.green; break;
+            case "yellow": color = Color.yellow; break;
+            case "blue": color = Color.blue; break;
+            case "white": color = Color.white; break;
+            default:
+                return new ActionResult{success = false, errorCode = "INVALID_COLOR", message = $"Unsupported color: {colorName}"};
+        }
+
+        Renderer renderer = target.Target.GetComponent<Renderer>();
+
+        if(renderer == null)
+            return new ActionResult{success = false, errorCode = "NO_RENDERER", message = "Target has no Renderer"};
+
+        renderer.material.color = color;
+
+        return new ActionResult{success = true, errorCode = "", message = ""};
+    }
+
+    // ============================
+    // TRANSFORM HANDLER (原代码)
+    // ============================
 
     private ActionResult HandleTransformModify(ActionSpec spec, JObject argsObj, ExecutionContext target)
     {
@@ -114,21 +193,21 @@ public class GeneralHandler : MonoBehaviour, IActionHandler
             }
         }
 
-        // Extract values
         string mode = argsObj["mode"]?.ToString() ?? "absolute";
         string space = argsObj["space"]?.ToString() ?? "world";
         Vector3? position = ParseVector3(argsObj["position"]);
         Vector3? rotation = ParseVector3(argsObj["rotation"]);
         Vector3? scale = ParseVector3(argsObj["scale"]);
 
-        // Apply to target transform
         Transform t = target.Target.transform;
+
         bool isAbsolute = mode == "absolute";
         bool isWorld = space == "world";
 
         if (position.HasValue)
         {
             Vector3 pos = position.Value;
+
             if (isAbsolute)
             {
                 if (isWorld) t.position = pos;
@@ -144,6 +223,7 @@ public class GeneralHandler : MonoBehaviour, IActionHandler
         if (rotation.HasValue)
         {
             Vector3 rot = rotation.Value;
+
             if (isAbsolute)
             {
                 if (isWorld) t.eulerAngles = rot;
@@ -158,17 +238,20 @@ public class GeneralHandler : MonoBehaviour, IActionHandler
         if (scale.HasValue)
         {
             Vector3 scl = scale.Value;
+
             if (isAbsolute) t.localScale = scl;
             else t.localScale += scl;
         }
 
-        return new ActionResult{success = true, errorCode = "", message = ""};
+        return new ActionResult{success = true};
     }
 
     private Vector3? ParseVector3(JToken token)
     {
         if (token == null || token.Type != JTokenType.Object) return null;
+
         var obj = (JObject)token;
+
         return new Vector3(
             obj["x"]?.Value<float>() ?? 0f,
             obj["y"]?.Value<float>() ?? 0f,
