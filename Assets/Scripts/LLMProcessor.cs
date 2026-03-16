@@ -23,14 +23,20 @@ public class LLMProcessor : MonoBehaviour
     private const string k_PlannerPrompt =
         @"You are an action planner for a Unity game. The user will describe what they want to do, and you will be given a list of available actions with their parameters.
 
-        Your job is to output a JSON action object that fulfills the user's intent.
+        Your job is to output a JSON array of trigger entries that fulfills the user's intent.
+
+        Each trigger entry has:
+        - ""condition"" (optional): { ""type"": ""..."", ""args"": {} }
+          If omitted, defaults to immediate execution (temporal.once with delay=0).
+        - ""action"" (required): { ""type"": ""..."", ""args"": {} }
 
         Rules:
         1. Output ONLY valid JSON, no extra text or explanation.
-        2. The JSON must have a ""type"" field matching one of the available action types.
-        3. The JSON must have an ""args"" object containing the required parameters.
-        4. Use default values for optional parameters unless the user specifies otherwise.
-        5. If the user's intent cannot be fulfilled by any available action, output: {""error"": true, ""reason"": ""<explanation of why no action matched and what actions are available>""}";
+        2. The output must be a JSON array, even if there is only one entry.
+        3. Each action ""type"" must match one of the available action types.
+        4. Each condition ""type"" must match one of the available condition types.
+        5. Use default values for optional parameters unless the user specifies otherwise.
+        6. If the user's intent cannot be fulfilled, output: {""error"": true, ""reason"": ""<explanation>""}";
 
     void Start()
     {
@@ -109,7 +115,7 @@ public class LLMProcessor : MonoBehaviour
         try
         {
             var response = JObject.Parse(responseText);
-            actionJson = response["choices"]?[0]?["message"]?["content"]?.ToString();
+            contentJson = response["choices"]?[0]?["message"]?["content"]?.ToString();
         }
         catch (Exception e)
         {
@@ -117,7 +123,7 @@ public class LLMProcessor : MonoBehaviour
             yield break;
         }
 
-        if (string.IsNullOrEmpty(actionJson))
+        if (string.IsNullOrEmpty(contentJson))
         {
             Debug.LogError("[LLMProcessor] Empty response from LLM.");
             yield break;
@@ -125,7 +131,21 @@ public class LLMProcessor : MonoBehaviour
 
         actionJson = ExtractJson(actionJson);
 
-        Debug.Log($"[LLMProcessor] Action JSON: {actionJson}");
+        // Check for error response
+        if (contentJson.TrimStart().StartsWith("{"))
+        {
+            try
+            {
+                var parsed = JObject.Parse(contentJson);
+                if (parsed["error"] != null)
+                {
+                    string reason = parsed["reason"]?.ToString() ?? "Unknown reason";
+                    Debug.LogWarning($"[LLMProcessor] Planner error: {reason}");
+                    yield break;
+                }
+            }
+            catch { }
+        }
 
         // Check planner error
         try
@@ -141,19 +161,23 @@ public class LLMProcessor : MonoBehaviour
         }
         catch (Exception e)
         {
-            Debug.LogError($"[LLMProcessor] LLM returned invalid JSON: {actionJson}");
-            Debug.LogError($"[LLMProcessor] Exception {e.Message}");
-            yield break;
+            Debug.LogError($"[LLMProcessor] Failed to parse trigger array: {e.Message}");
+            return;
         }
 
-        ExecuteJson(obj, actionJson);
-    }
+        // Unregister all previous triggers for this target
+        triggerSystem.UnregisterByTarget(target);
 
-    private string ExtractJson(string text)
-    {
-        int start = text.IndexOf('{');
-        int end = text.LastIndexOf('}');
-        return text.Substring(start, end - start + 1);
+        int registered = 0;
+        foreach (var token in entries)
+        {
+            string entryJson = token.ToString();
+            int id = triggerSystem.Register(entryJson, target);
+            if (id >= 0)
+                registered++;
+        }
+
+        Debug.Log($"[LLMProcessor] Registered {registered}/{entries.Count} trigger(s) on '{target.name}'");
     }
 
     private string PrintHandlers(GameObject obj)
@@ -162,7 +186,7 @@ public class LLMProcessor : MonoBehaviour
 
         if (handlers.Length == 0)
         {
-            Debug.Log($"[ActionDebugger] '{obj.name}' has no IActionHandler.");
+            Debug.Log($"[LLMProcessor] '{obj.name}' has no IActionHandler.");
             return "";
         }
 
