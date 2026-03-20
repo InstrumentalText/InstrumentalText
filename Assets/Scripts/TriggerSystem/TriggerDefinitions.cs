@@ -5,6 +5,7 @@ using System;
 public class TriggerEntry
 {
     public int id;
+    public int instrumentId;
 
     // ── Condition side ──
     public string conditionType;

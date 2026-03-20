@@ -7,8 +7,16 @@ using System.Text;
 
 public class LLMProcessor : MonoBehaviour
 {
-    [SerializeField] private TriggerSystem triggerSystem;
-    [SerializeField] private ConditionSystem conditionSystem;
+    private TriggerSystem triggerSystem;
+    private InstrumentRegistry instrumentRegistry;
+    private ConditionSystem conditionSystem;
+
+    private void Awake()
+    {
+        triggerSystem = FindAnyObjectByType<TriggerSystem>();
+        instrumentRegistry = FindAnyObjectByType<InstrumentRegistry>();
+        conditionSystem = FindAnyObjectByType<ConditionSystem>();
+    }
 
     private string m_OpenaiAPIKey;
 
@@ -55,10 +63,10 @@ public class LLMProcessor : MonoBehaviour
         string conditionsDescription = conditionSystem.GetFormattedSpecs();
 
         string userMessage = $"User intent: {userIntent}\n\nAvailable actions:\n{handlersDescription}\n\n{conditionsDescription}";
-        StartCoroutine(SendOpenAIRequest(obj, userMessage));
+        StartCoroutine(SendOpenAIRequest(obj, userIntent, userMessage));
     }
 
-    private IEnumerator SendOpenAIRequest(GameObject obj, string userMessage)
+    private IEnumerator SendOpenAIRequest(GameObject obj, string userIntent, string userMessage)
     {
         var requestBody = new JObject
         {
@@ -127,7 +135,7 @@ public class LLMProcessor : MonoBehaviour
             catch { }
         }
 
-        RegisterTriggers(obj, contentJson);
+        RegisterTriggers(obj, userIntent, contentJson);
     }
 
     /// <summary>
@@ -154,9 +162,9 @@ public class LLMProcessor : MonoBehaviour
     }
 
     /// <summary>
-    /// Unregister all previous triggers on this target, then register new ones.
+    /// Register triggers as a single instrument.
     /// </summary>
-    private void RegisterTriggers(GameObject target, string json)
+    private void RegisterTriggers(GameObject target, string userIntent, string json)
     {
         JArray entries;
         try
@@ -169,19 +177,27 @@ public class LLMProcessor : MonoBehaviour
             return;
         }
 
-        // Unregister all previous triggers for this target
-        triggerSystem.UnregisterByTarget(target);
-
-        int registered = 0;
+        // Reserve an instrument ID first, then register triggers with it
+        var triggerIds = new System.Collections.Generic.List<int>();
+        // Use a temporary ID; InstrumentRegistry assigns the real one
+        // We need the instrument ID before registering triggers, so we do a two-phase approach:
+        // Phase 1: register triggers with instrumentId=0
+        // Phase 2: create instrument, then patch the instrumentId on triggers
         foreach (var token in entries)
         {
             string entryJson = token.ToString();
             int id = triggerSystem.Register(entryJson, target);
             if (id >= 0)
-                registered++;
+                triggerIds.Add(id);
         }
 
-        Debug.Log($"[LLMProcessor] Registered {registered}/{entries.Count} trigger(s) on '{target.name}'");
+        if (triggerIds.Count > 0)
+        {
+            int instrumentId = instrumentRegistry.RegisterInstrument(target, userIntent, triggerIds);
+            triggerSystem.PatchInstrumentId(triggerIds, instrumentId);
+        }
+
+        Debug.Log($"[LLMProcessor] Registered {triggerIds.Count}/{entries.Count} trigger(s) on '{target.name}'");
     }
 
     private string PrintHandlers(GameObject obj)
