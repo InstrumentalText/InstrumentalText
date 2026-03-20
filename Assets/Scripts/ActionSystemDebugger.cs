@@ -1,7 +1,5 @@
 using UnityEngine;
 using System.Text;
-using System.Collections.Generic;
-using Newtonsoft.Json.Linq;
 
 [RequireComponent(typeof(Camera))]
 public class ActionSystemDebugger : MonoBehaviour
@@ -15,13 +13,14 @@ public class ActionSystemDebugger : MonoBehaviour
     private GameObject targetInSelection;
 
     private LLMProcessor llmProcessor;
+    private InstrumentRegistry instrumentRegistry;
     private Camera cam;
-    private readonly List<Material> modifiedMats = new();
 
     void Start()
     {
         cam = GetComponent<Camera>();
         llmProcessor = FindFirstObjectByType<LLMProcessor>();
+        instrumentRegistry = FindFirstObjectByType<InstrumentRegistry>();
     }
 
     void Update()
@@ -37,6 +36,7 @@ public class ActionSystemDebugger : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.Return) && targetInSelection != null)
         {
+            Debug.Log($"Apply text {prompt} to object {targetInSelection}");
             llmProcessor.ProcessPrompt(targetInSelection, prompt);
         }
     }
@@ -49,20 +49,20 @@ public class ActionSystemDebugger : MonoBehaviour
 
         targetInSelection = obj;
 
-        modifiedMats.Clear();
-        foreach (var renderer in obj.GetComponentsInChildren<Renderer>())
+        var objectController = obj.GetComponent<ObjectController>();
+        if (objectController != null)
         {
-            foreach (var mat in renderer.materials)
-            {
-                if (mat.IsKeywordEnabled("_EMISSION")) continue;
-
-                mat.EnableKeyword("_EMISSION");
-                mat.SetColor("_EmissionColor", emissionColor);
-                modifiedMats.Add(mat);
-            }
+            objectController.Select(emissionColor);
+        }
+        else
+        {
+            var canvasController = obj.GetComponent<CanvasController>();
+            if (canvasController != null)
+                canvasController.Select();
         }
 
         PrintHandlerSpecs(obj);
+        PrintInstruments(obj);
     }
 
     private void PrintHandlerSpecs(GameObject obj)
@@ -96,16 +96,44 @@ public class ActionSystemDebugger : MonoBehaviour
         Debug.Log(sb.ToString());
     }
 
+    private void PrintInstruments(GameObject obj)
+    {
+        if (instrumentRegistry == null) return;
+
+        var instruments = instrumentRegistry.GetInstrumentsByTarget(obj);
+        if (instruments.Count == 0)
+        {
+            Debug.Log($"[ActionDebugger] {obj.name}: No instruments mounted.");
+            return;
+        }
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"[ActionDebugger] {obj.name} — {instruments.Count} instrument(s):");
+
+        foreach (var inst in instruments)
+        {
+            sb.AppendLine($"  Instrument #{inst.id}: \"{inst.userIntent}\"");
+            sb.AppendLine($"    Active triggers: {inst.triggerIds.Count} ({string.Join(", ", inst.triggerIds)})");
+        }
+
+        Debug.Log(sb.ToString());
+    }
+
     private void Deselect()
     {
         if (targetInSelection == null) return;
 
-        foreach (var mat in modifiedMats)
+        var objectController = targetInSelection.GetComponent<ObjectController>();
+        if (objectController != null)
         {
-            mat.SetColor("_EmissionColor", Color.black);
-            mat.DisableKeyword("_EMISSION");
+            objectController.Deselect();
         }
-        modifiedMats.Clear();
+        else
+        {
+            var canvasController = targetInSelection.GetComponent<CanvasController>();
+            if (canvasController != null)
+                canvasController.Deselect();
+        }
 
         targetInSelection = null;
     }

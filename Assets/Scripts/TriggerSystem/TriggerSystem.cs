@@ -4,9 +4,16 @@ using Newtonsoft.Json.Linq;
 
 public class TriggerSystem : MonoBehaviour
 {
-    [SerializeField] private ConditionSystem conditionSystem;
+    private ConditionSystem conditionSystem;
+    private InstrumentRegistry instrumentRegistry;
     [SerializeField] private GameObject subjectA;
     [SerializeField] private GameObject subjectB;
+
+    private void Awake()
+    {
+        conditionSystem = FindAnyObjectByType<ConditionSystem>();
+        instrumentRegistry = FindAnyObjectByType<InstrumentRegistry>();
+    }
 
     private int nextId = 1;
     private readonly List<TriggerEntry> activeTriggers = new();
@@ -21,7 +28,7 @@ public class TriggerSystem : MonoBehaviour
     /// }
     /// If "condition" is omitted, defaults to temporal.once with delay=0.
     /// </summary>
-    public int Register(string json, GameObject target)
+    public int Register(string json, GameObject target, int instrumentId = 0)
     {
         JObject root;
         try { root = JObject.Parse(json); }
@@ -31,7 +38,7 @@ public class TriggerSystem : MonoBehaviour
             return -1;
         }
 
-        var entry = new TriggerEntry { id = nextId++ };
+        var entry = new TriggerEntry { id = nextId++, instrumentId = instrumentId };
 
         // ── Parse condition ──
         var condition = root["condition"] as JObject;
@@ -125,6 +132,28 @@ public class TriggerSystem : MonoBehaviour
             Debug.Log($"[TriggerSystem] Unregistered {removed} trigger(s) on '{target.name}'");
     }
 
+    /// <summary>
+    /// Assign an instrument ID to a batch of triggers after registration.
+    /// </summary>
+    public void PatchInstrumentId(List<int> triggerIds, int instrumentId)
+    {
+        foreach (var entry in activeTriggers)
+        {
+            if (triggerIds.Contains(entry.id))
+                entry.instrumentId = instrumentId;
+        }
+    }
+
+    /// <summary>
+    /// Unregister all triggers belonging to a specific instrument.
+    /// </summary>
+    public void UnregisterByInstrumentId(int instrumentId)
+    {
+        int removed = activeTriggers.RemoveAll(e => e.instrumentId == instrumentId);
+        if (removed > 0)
+            Debug.Log($"[TriggerSystem] Unregistered {removed} trigger(s) for instrument #{instrumentId}");
+    }
+
     private void Update()
     {
         for (int i = activeTriggers.Count - 1; i >= 0; i--)
@@ -183,8 +212,15 @@ public class TriggerSystem : MonoBehaviour
             }
         }
 
-        // Clean up completed entries
-        activeTriggers.RemoveAll(e => e.completed);
+        // Clean up completed entries and notify registry
+        for (int j = activeTriggers.Count - 1; j >= 0; j--)
+        {
+            if (!activeTriggers[j].completed) continue;
+            var done = activeTriggers[j];
+            if (done.instrumentId > 0 && instrumentRegistry != null)
+                instrumentRegistry.OnTriggerCompleted(done.instrumentId, done.id);
+            activeTriggers.RemoveAt(j);
+        }
     }
 
     private void ExecuteAction(TriggerEntry entry)
@@ -198,7 +234,8 @@ public class TriggerSystem : MonoBehaviour
 
             var result = handler.Execute(entry.actionType, entry.actionArgsJson, context);
             if (result.success)
-                Debug.Log($"[TriggerSystem] Trigger #{entry.id} fired: {entry.actionType} on '{entry.targetObject.name}'");
+                return;
+                // Debug.Log($"[TriggerSystem] Trigger #{entry.id} fired: {entry.actionType} on '{entry.targetObject.name}'");
             else
                 Debug.LogWarning($"[TriggerSystem] Trigger #{entry.id} action failed: [{result.errorCode}] {result.message}");
             return;
