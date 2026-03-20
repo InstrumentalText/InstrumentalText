@@ -80,13 +80,43 @@
 // }
 
 
+// using UnityEngine;
+
+// public class ApplyTargetHighlighter : MonoBehaviour
+// {
+//     public static ApplyTargetHighlighter Instance;
+
+//     private bool applyMode = false;
+
+//     void Awake()
+//     {
+//         if (Instance != null)
+//         {
+//             Destroy(this);
+//             return;
+//         }
+
+//         Instance = this;
+//     }
+
+//     public void SetApplyMode(bool state)
+//     {
+//         applyMode = state;
+//         Debug.Log($"[ApplyTargetHighlighter] ApplyMode = {applyMode}");
+//     }
+
+//     public bool IsApplyMode()
+//     {
+//         return applyMode;
+//     }
+// }
+
+
 using UnityEngine;
 
 public class ApplyTargetHighlighter : MonoBehaviour
 {
     public static ApplyTargetHighlighter Instance;
-
-    private bool applyMode = false;
 
     void Awake()
     {
@@ -101,12 +131,11 @@ public class ApplyTargetHighlighter : MonoBehaviour
 
     public void SetApplyMode(bool state)
     {
-        applyMode = state;
-        Debug.Log($"[ApplyTargetHighlighter] ApplyMode = {applyMode}");
+        Debug.Log($"[ApplyTargetHighlighter] (Deprecated) SetApplyMode = {state}");
     }
 
     public bool IsApplyMode()
     {
-        return applyMode;
+        return GazePinchPromptApplierOnDevice_Case2.ActiveInstance != null;
     }
 }

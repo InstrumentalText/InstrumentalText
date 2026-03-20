@@ -137,11 +137,11 @@ public class TriggerSystem : MonoBehaviour
                 e.subjectA, e.subjectB,
                 e.startTime, e.lastFireTime);
 
-            // string detail = conditionSystem.GetDebugDetail(
-            //     e.conditionType, e.conditionArgsJson,
-            //     e.subjectA, e.subjectB,
-            //     e.startTime, e.lastFireTime);
-            // Debug.Log($"[TriggerSystem] Trigger #{e.id} [{e.conditionType}] → {e.actionType} on '{e.targetObject.name}' | raw={raw} wasInside={e.wasInside} | {detail}");
+            string detail = conditionSystem.GetDebugDetail(
+                e.conditionType, e.conditionArgsJson,
+                e.subjectA, e.subjectB,
+                e.startTime, e.lastFireTime);
+            Debug.Log($"[TriggerSystem] Trigger #{e.id} [{e.conditionType}] → {e.actionType} on '{e.targetObject.name}' | raw={raw} wasInside={e.wasInside} | {detail}");
 
             switch (e.conditionType)
             {
