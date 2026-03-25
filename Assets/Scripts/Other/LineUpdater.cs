@@ -25,3 +25,4 @@ public class LineUpdater : MonoBehaviour
         lr.SetPosition(1, b.position);
     }
 }
+

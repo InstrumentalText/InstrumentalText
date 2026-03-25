@@ -1,176 +1,119 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 using Newtonsoft.Json.Linq;
-using UnityPdfViewer;
 
 public class PdfViewerHandler : MonoBehaviour, IActionHandler
 {
-    [SerializeField] private string pdfFileName;
-    [SerializeField] private string extractResultFileName;
+    [Header("Image-based PDF (XR Canvas)")]
+    [Tooltip("PDF每页的图片，Inspector 按顺序填写")]
+    [SerializeField] private List<Texture2D> pages;
+    [SerializeField] private RawImage screenImage;
+
+    [Header("Extract (Inspector prefab already configured)")]
+    [Tooltip("Prefab 上挂 CanvasHandler + MarkdownRenderer，并填好每页内容")]
     [SerializeField] private GameObject extractResultObject;
-    [SerializeField] private Vector3 extractSpawnOffset = new Vector3(2f, 0f, 0f);
+    [SerializeField] private Vector3 extractSpawnOffset = new Vector3(0.4f, 0f, 0f);
 
-    private PdfViewerUI pdfViewerUI;
-
-    private void Awake()
-    {
-        pdfViewerUI = GetComponent<PdfViewerUI>();
-    }
+    private int currentPage = 0;
 
     private void Start()
     {
-        if (pdfViewerUI != null && !string.IsNullOrEmpty(pdfFileName))
-            pdfViewerUI.LoadPDF(pdfFileName);
+        if (pages != null && pages.Count > 0 && screenImage != null)
+        {
+            currentPage = 0;
+            screenImage.texture = pages[currentPage];
+            Debug.Log("[PdfViewerHandler] Initialized first page");
+        }
+        else
+        {
+            Debug.LogWarning("[PdfViewerHandler] pages or screenImage not set");
+        }
     }
 
     private static readonly List<ActionSpec> actionSpecs = new()
     {
-        new ActionSpec
-        {
-            type = "pdf.page_up",
-            summary = "Go to the previous page",
-            description = "Navigate to the previous page of the PDF document.",
-            args = new List<ArgSpec>(),
-            examples = new List<string>
-            {
-                "{\"type\":\"pdf.page_up\",\"args\":{}}"
-            }
-        },
-        new ActionSpec
-        {
-            type = "pdf.page_down",
-            summary = "Go to the next page",
-            description = "Navigate to the next page of the PDF document.",
-            args = new List<ArgSpec>(),
-            examples = new List<string>
-            {
-                "{\"type\":\"pdf.page_down\",\"args\":{}}"
-            }
-        },
-        new ActionSpec
-        {
-            type = "pdf.load",
-            summary = "Load a PDF file",
-            description = "Load and display a PDF file by its file name.",
-            args = new List<ArgSpec>
-            {
-                new ArgSpec
-                {
-                    name = "fileName",
-                    argType = "string",
-                    required = true,
-                    description = "The PDF file name to load."
-                }
-            },
-            examples = new List<string>
-            {
-                "{\"type\":\"pdf.load\",\"args\":{\"fileName\":\"document.pdf\"}}"
-            }
-        },
-        new ActionSpec
-        {
-            type = "pdf.extract",
-            summary = "Extract key information from the PDF and display as a summary",
-            description = "Extract and summarize the key information from the current PDF document. The result is displayed on a new canvas.",
-            args = new List<ArgSpec>(),
-            examples = new List<string>
-            {
-                "{\"type\":\"pdf.extract\",\"args\":{}}"
-            }
-        },
-        new ActionSpec
-        {
-            type = "pdf.go_to_page",
-            summary = "Jump to a specific page",
-            description = "Navigate to a specific page number of the PDF document.",
-            args = new List<ArgSpec>
-            {
-                new ArgSpec
-                {
-                    name = "page",
-                    argType = "int",
-                    required = true,
-                    description = "The page number to jump to (1-based).",
-                    constraints = new ArgConstraints { min = 1 }
-                }
-            },
-            examples = new List<string>
-            {
-                "{\"type\":\"pdf.go_to_page\",\"args\":{\"page\":3}}"
-            }
-        }
+        new ActionSpec { type = "pdf.page_up", summary = "Go to previous page", args = new List<ArgSpec>(), examples = new List<string>{ "{\"type\":\"pdf.page_up\",\"args\":{}}" } },
+        new ActionSpec { type = "pdf.page_down", summary = "Go to next page", args = new List<ArgSpec>(), examples = new List<string>{ "{\"type\":\"pdf.page_down\",\"args\":{}}" } },
+        new ActionSpec { type = "pdf.load", summary = "Load document", args = new List<ArgSpec>{ new ArgSpec{ name="fileName", argType="string", required=true } }, examples = new List<string>{ "{\"type\":\"pdf.load\",\"args\":{\"fileName\":\"doc.pdf\"}}" } },
+        new ActionSpec { type = "pdf.extract", summary = "Extract summary", args = new List<ArgSpec>(), examples = new List<string>{ "{\"type\":\"pdf.extract\",\"args\":{}}" } },
+        new ActionSpec { type = "pdf.go_to_page", summary = "Go to page", args = new List<ArgSpec>{ new ArgSpec{ name="page", argType="int", required=true } }, examples = new List<string>{ "{\"type\":\"pdf.go_to_page\",\"args\":{\"page\":3}}" } }
     };
 
-    public IReadOnlyList<ActionSpec> GetActionSpecs()
-    {
-        return actionSpecs;
-    }
+    public IReadOnlyList<ActionSpec> GetActionSpecs() => actionSpecs;
 
-    public bool CanHandle(string actionType)
-    {
-        return actionType == "pdf.page_up"
-            || actionType == "pdf.page_down"
-            || actionType == "pdf.go_to_page"
-            || actionType == "pdf.load"
-            || actionType == "pdf.extract";
-    }
+    public bool CanHandle(string actionType) => actionType.StartsWith("pdf.");
 
     public ActionResult Execute(string actionType, string argsJson, ExecutionContext target)
     {
-        if (pdfViewerUI == null)
-            return new ActionResult { success = false, errorCode = "NO_VIEWER", message = "PDFViewerUI not found." };
-
         JObject argsObj;
         try { argsObj = JObject.Parse(argsJson ?? "{}"); }
-        catch (Exception e) { return new ActionResult { success = false, errorCode = "INVALID_JSON", message = e.Message }; }
+        catch (Exception e) { return new ActionResult { success=false, errorCode="INVALID_JSON", message=e.Message }; }
 
         if (actionType == "pdf.extract")
             return ExecuteExtract();
 
         switch (actionType)
         {
-            case "pdf.page_up":
-                pdfViewerUI.PreviousPage();
-                break;
-            case "pdf.page_down":
-                pdfViewerUI.NextPage();
-                break;
-            case "pdf.load":
-                var fileToken = argsObj["fileName"];
-                if (fileToken == null)
-                    return new ActionResult { success = false, errorCode = "MISSING_ARG", message = "Missing required argument: fileName" };
-                pdfViewerUI.LoadPDF(fileToken.Value<string>());
-                break;
+            case "pdf.load": return ExecuteLoad();
+            case "pdf.page_up": return PageUp();
+            case "pdf.page_down": return PageDown();
             case "pdf.go_to_page":
                 var pageToken = argsObj["page"];
                 if (pageToken == null)
-                    return new ActionResult { success = false, errorCode = "MISSING_ARG", message = "Missing required argument: page" };
-                pdfViewerUI.GoToPage(pageToken.Value<int>());
-                break;
-            default:
-                return new ActionResult { success = false, errorCode = "UNKNOWN_ACTION", message = $"Unsupported action: {actionType}" };
+                    return new ActionResult { success=false, errorCode="MISSING_ARG" };
+                return GoToPage(pageToken.Value<int>());
+            default: return new ActionResult { success=false, errorCode="UNKNOWN_ACTION" };
         }
+    }
 
-        return new ActionResult { success = true, errorCode = "", message = "" };
+    private ActionResult ExecuteLoad()
+    {
+        if (pages == null || pages.Count==0 || screenImage==null)
+            return new ActionResult { success=false, errorCode="NO_DATA" };
+        currentPage = 0;
+        screenImage.texture = pages[currentPage];
+        return new ActionResult { success=true };
+    }
+
+    private ActionResult PageUp()
+    {
+        if (currentPage<=0) return new ActionResult { success=false, message="Already first page" };
+        currentPage--;
+        screenImage.texture = pages[currentPage];
+        return new ActionResult { success=true };
+    }
+
+    private ActionResult PageDown()
+    {
+        if (currentPage>=pages.Count-1) return new ActionResult { success=false, message="Already last page" };
+        currentPage++;
+        screenImage.texture = pages[currentPage];
+        return new ActionResult { success=true };
+    }
+
+    private ActionResult GoToPage(int page)
+    {
+        int index = page-1;
+        if (index<0 || index>=pages.Count)
+            return new ActionResult { success=false, errorCode="OUT_OF_RANGE" };
+        currentPage = index;
+        screenImage.texture = pages[currentPage];
+        return new ActionResult { success=true };
     }
 
     private ActionResult ExecuteExtract()
     {
         if (extractResultObject == null)
-            return new ActionResult { success = false, errorCode = "NO_OBJECT", message = "Extract result object is not assigned." };
-
-        if (string.IsNullOrEmpty(extractResultFileName))
-            return new ActionResult { success = false, errorCode = "NO_RESULT_FILE", message = "Extract result file name is not assigned." };
+            return new ActionResult { success=false, errorCode="NO_OBJECT" };
 
         extractResultObject.SetActive(true);
-        extractResultObject.transform.position = transform.position + extractSpawnOffset;
+        extractResultObject.transform.position = transform.position + transform.right * extractSpawnOffset.x;
+        extractResultObject.transform.rotation = transform.rotation;
 
-        var renderer = extractResultObject.GetComponent<MarkdownRenderer>();
-        if (renderer == null)
-            return new ActionResult { success = false, errorCode = "NO_RENDERER", message = "Extract result object does not have a MarkdownRenderer component." };
+        Debug.Log("[PdfViewerHandler] Extract prefab activated");
 
-        renderer.LoadMarkdown(extractResultFileName);
-        return new ActionResult { success = true, errorCode = "", message = $"Extract result loaded: {extractResultFileName}" };
+        return new ActionResult { success=true };
     }
 }

@@ -1,245 +1,3 @@
-// using System.Collections.Generic;
-// using UnityEngine;
-// using TMPro;
-
-// public class InteractionViewVisualizer : MonoBehaviour
-// {
-//     [Header("View Toggle")]
-//     public bool openView = false;
-
-//     [Header("Prefabs")]
-//     public GameObject panelPrefab;
-
-//     [Header("Line Settings")]
-//     public Material lineMaterial;
-//     public Color lineColor = Color.white;
-//     public float lineWidth = 0.01f; // 可在 Inspector 调整
-
-//     [Header("Layout")]
-//     public float heightOffset = 0.0f;
-
-//     [Header("Placement")]
-//     public float spawnDistance = 2f; // 面板出现距离
-//     public float rootPanelSpacing = 0.5f; // 根面板之间的基础间距
-//     public float rootPanelOffsetRange = 0.05f; // 随机偏移范围
-
-//     [Header("Radius Random")]
-//     public float radiusMin = 0.3f;
-//     public float radiusMax = 0.7f;
-
-//     private List<GameObject> spawnedPanels = new List<GameObject>();
-//     private List<GameObject> spawnedLines = new List<GameObject>();
-//     private bool lastState = false;
-
-//     void Update()
-//     {
-//         if (openView != lastState)
-//         {
-//             if (openView)
-//                 ShowView();
-//             else
-//                 ClearView();
-
-//             lastState = openView;
-//         }
-//     }
-
-//     // =========================
-//     // 主入口（语义 View）
-//     // =========================
-//     void ShowView()
-//     {
-//         ClearView();
-
-//         var records = InteractionLibraryManager.Instance.GetAllRecords();
-
-//         if (records == null || records.Count == 0)
-//         {
-//             Debug.Log("[View] Using Mock Data");
-//             records = GetMockRecords();
-//         }
-
-//         if (records.Count == 0)
-//         {
-//             Debug.Log("[View] No records");
-//             return;
-//         }
-
-//         HideAllTextObjects();
-
-//         // 按 target 分组
-//         Dictionary<string, List<InteractionRecord>> grouped = new Dictionary<string, List<InteractionRecord>>();
-//         foreach (var r in records)
-//         {
-//             if (!grouped.ContainsKey(r.targetName))
-//                 grouped[r.targetName] = new List<InteractionRecord>();
-//             grouped[r.targetName].Add(r);
-//         }
-
-//         Transform cam = Camera.main.transform;
-//         Vector3 forwardPos = cam.position + cam.forward * spawnDistance;
-
-//         float angleStep = 360f / Mathf.Max(grouped.Count, 1);
-//         float currentAngle = 0f;
-
-//         foreach (var pair in grouped)
-//         {
-//             string targetName = pair.Key;
-//             List<InteractionRecord> list = pair.Value;
-
-//             // 生成 root panel 的位置：使用角度 + 随机半径偏移
-//             float distance = rootPanelSpacing + Random.Range(0f, rootPanelOffsetRange);
-//             Vector3 offset = new Vector3(Mathf.Cos(currentAngle * Mathf.Deg2Rad) * distance,
-//                                          Random.Range(-0.2f, 0.2f), // 上下轻微偏移
-//                                          Mathf.Sin(currentAngle * Mathf.Deg2Rad) * distance);
-//             Vector3 targetCenterPos = forwardPos + offset;
-//             currentAngle += angleStep;
-
-//             GameObject centerPanel = CreateCenterPanel(targetName, targetCenterPos);
-//             spawnedPanels.Add(centerPanel);
-
-//             int count = list.Count;
-
-//             // 每组内部 panel 布局：完整圆 + 随机半径
-//             for (int i = 0; i < count; i++)
-//             {
-//                 float angle = i * Mathf.PI * 2f / count;
-//                 float r = Random.Range(radiusMin, radiusMax);
-
-//                 Vector3 pos = targetCenterPos + new Vector3(
-//                     Mathf.Cos(angle) * r,
-//                     Mathf.Sin(angle) * r,
-//                     0
-//                 );
-
-//                 GameObject panel = CreatePromptPanel(list[i], pos);
-//                 spawnedPanels.Add(panel);
-
-//                 // 线条从中心连接
-//                 CreateLine(panel.transform.position, centerPanel.transform.position);
-//             }
-//         }
-
-//         Debug.Log("[View] Semantic Wall View Spawned");
-//     }
-
-//     // =========================
-//     // 创建中心 Panel
-//     // =========================
-//     GameObject CreateCenterPanel(string targetName, Vector3 pos)
-//     {
-//         GameObject panel = Instantiate(panelPrefab, pos, Quaternion.identity);
-//         panel.transform.forward = Camera.main.transform.forward;
-
-//         TMP_Text text = panel.GetComponentInChildren<TMP_Text>();
-//         if (text != null) text.text = targetName;
-
-//         return panel;
-//     }
-
-//     // =========================
-//     // 创建 Prompt Panel
-//     // =========================
-//     GameObject CreatePromptPanel(InteractionRecord record, Vector3 pos)
-//     {
-//         GameObject panel = Instantiate(panelPrefab, pos, Quaternion.identity);
-//         panel.transform.forward = Camera.main.transform.forward;
-
-//         TMP_Text text = panel.GetComponentInChildren<TMP_Text>();
-//         if (text != null) text.text = record.prompt;
-
-//         return panel;
-//     }
-
-//     // =========================
-//     // 创建线条
-//     // =========================
-//     void CreateLine(Vector3 a, Vector3 b)
-//     {
-//         GameObject lineObj = new GameObject("Line");
-//         LineRenderer lr = lineObj.AddComponent<LineRenderer>();
-
-//         lr.material = lineMaterial;
-//         lr.startColor = lineColor;
-//         lr.endColor = lineColor;
-//         lr.startWidth = lineWidth;
-//         lr.endWidth = lineWidth;
-//         lr.positionCount = 2;
-//         lr.SetPosition(0, a);
-//         lr.SetPosition(1, b);
-
-//         spawnedLines.Add(lineObj);
-//     }
-
-//     // =========================
-//     // 隐藏原 Text Objects
-//     // =========================
-//     void HideAllTextObjects()
-//     {
-//         foreach (var t in FindObjectsOfType<CurrentTextStore>())
-//             t.gameObject.SetActive(false);
-//     }
-
-//     // =========================
-//     // 显示原 Text Objects
-//     // =========================
-//     void ShowAllTextObjects()
-//     {
-//         foreach (var t in FindObjectsOfType<CurrentTextStore>())
-//             t.gameObject.SetActive(true);
-//     }
-
-//     // =========================
-//     // 清理
-//     // =========================
-//     void ClearView()
-//     {
-//         foreach (var p in spawnedPanels) Destroy(p);
-//         foreach (var l in spawnedLines) Destroy(l);
-//         spawnedPanels.Clear();
-//         spawnedLines.Clear();
-//         ShowAllTextObjects();
-//         Debug.Log("[View] Cleared");
-//     }
-
-//     // =========================
-//     // Mock 数据
-//     // =========================
-//     List<InteractionRecord> GetMockRecords()
-//     {
-//         List<InteractionRecord> mock = new List<InteractionRecord>();
-
-//         // TV
-//         mock.Add(new InteractionRecord("turn on", "TV"));
-//         mock.Add(new InteractionRecord("turn off", "TV"));
-//         mock.Add(new InteractionRecord("switch channel", "TV"));
-//         mock.Add(new InteractionRecord("turn off after 2 hours", "TV"));
-//         mock.Add(new InteractionRecord("increase volume", "TV"));
-//         mock.Add(new InteractionRecord("decrease volume", "TV"));
-//         mock.Add(new InteractionRecord("mute", "TV"));
-
-//         // Air Conditioner
-//         mock.Add(new InteractionRecord("turn on", "Air Conditioner"));
-//         mock.Add(new InteractionRecord("turn off", "Air Conditioner"));
-//         mock.Add(new InteractionRecord("increase temperature", "Air Conditioner"));
-//         mock.Add(new InteractionRecord("decrease temperature", "Air Conditioner"));
-//         mock.Add(new InteractionRecord("turn off at 2 AM", "Air Conditioner"));
-//         mock.Add(new InteractionRecord("set to 24 degrees", "Air Conditioner"));
-//         mock.Add(new InteractionRecord("enable eco mode", "Air Conditioner"));
-
-//         // Computer
-//         mock.Add(new InteractionRecord("send today's schedule to Alex", "Computer"));
-//         mock.Add(new InteractionRecord("open email", "Computer"));
-//         mock.Add(new InteractionRecord("start meeting", "Computer"));
-//         mock.Add(new InteractionRecord("shutdown", "Computer"));
-//         mock.Add(new InteractionRecord("restart", "Computer"));
-//         mock.Add(new InteractionRecord("open browser", "Computer"));
-
-//         return mock;
-//     }
-// }
-
-
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
@@ -249,29 +7,30 @@ public class InteractionViewVisualizer : MonoBehaviour
     [Header("View Toggle")]
     public bool openView = false;
 
+    [Header("XR Gaze")]
+    public UnityEngine.XR.Interaction.Toolkit.Interactors.XRRayInteractor gazeInteractor;
+
     [Header("Prefabs")]
     public GameObject panelPrefab;
 
-    [Header("Line Settings")]
-    public Material lineMaterial;
-    public Color lineColor = Color.white;
-    public float lineWidth = 0.01f; // 可在 Inspector 调整
+    [Header("Dot Connection")]
+    public string dotName = "Dot";
+    public Color lineColor = Color.green;
+    public float lineWidth = 0.02f;
 
     [Header("Layout")]
-    public float heightOffset = 0.0f;
-
-    [Header("Placement")]
-    public float spawnDistance = 2f;          // root panel 出现距离
-    public float rootPanelSpacingX = 1.0f;    // 列间距
-    public float rootPanelSpacingY = 0.8f;    // 行间距
-    public int maxPerRow = 4;                 // 每行最多 root panel 个数
+    public float spawnDistance = 2f;
+    public float rootPanelSpacingX = 1.0f;
+    public float rootPanelSpacingY = 0.8f;
+    public int maxPerRow = 4;
 
     [Header("Radius Random")]
-    public float radiusMin = 0.3f; // prompt panel 半径最小值
-    public float radiusMax = 0.7f; // prompt panel 半径最大值
+    public float radiusMin = 0.3f;
+    public float radiusMax = 0.7f;
 
     private List<GameObject> spawnedPanels = new List<GameObject>();
     private List<GameObject> spawnedLines = new List<GameObject>();
+
     private bool lastState = false;
 
     void Update()
@@ -287,218 +46,214 @@ public class InteractionViewVisualizer : MonoBehaviour
         }
     }
 
-    // =========================
-    // 主入口（语义 View）
-    // =========================
     void ShowView()
-{
-    ClearView();
-
-    var records = InteractionLibraryManager.Instance.GetAllRecords();
-    if (records == null || records.Count == 0)
     {
-        Debug.Log("[View] Using Mock Data");
-        records = GetMockRecords();
-    }
+        ClearView();
 
-    if (records.Count == 0)
-    {
-        Debug.Log("[View] No records");
-        return;
-    }
 
-    HideAllTextObjects();
+        Dictionary<string, List<string>> grouped = new Dictionary<string, List<string>>();
 
-    // 按 target 分组
-    Dictionary<string, List<InteractionRecord>> grouped = new Dictionary<string, List<InteractionRecord>>();
-    foreach (var r in records)
-    {
-        if (!grouped.ContainsKey(r.targetName))
-            grouped[r.targetName] = new List<InteractionRecord>();
-        grouped[r.targetName].Add(r);
-    }
-
-    Transform cam = Camera.main.transform;
-    Vector3 forwardPos = cam.position + cam.forward * spawnDistance;
-
-    int total = grouped.Count;
-    int rows = Mathf.CeilToInt((float)total / maxPerRow);
-
-    // ✅ 计算整体宽高
-    float totalWidth = (maxPerRow - 1) * rootPanelSpacingX;
-    float totalHeight = (rows - 1) * rootPanelSpacingY;
-
-    // ✅ 关键：中心偏移（让整个 grid 居中）
-    Vector3 centerOffset = new Vector3(
-        -totalWidth / 2f,
-         totalHeight / 2f,
-         0f
-    );
-
-    int index = 0;
-
-    foreach (var pair in grouped)
-    {
-        string targetName = pair.Key;
-        List<InteractionRecord> list = pair.Value;
-
-        int row = index / maxPerRow;
-        int col = index % maxPerRow;
-
-        Vector3 offset = new Vector3(
-            col * rootPanelSpacingX,
-            -row * rootPanelSpacingY,
-            0f
-        );
-
-        // ✅ 应用中心偏移
-        Vector3 targetCenterPos = forwardPos + centerOffset + offset;
-
-        GameObject centerPanel = CreateCenterPanel(targetName, targetCenterPos);
-        spawnedPanels.Add(centerPanel);
-
-        int count = list.Count;
-
-        for (int i = 0; i < count; i++)
+        if (TextObjectManager.Instance == null)
         {
-            float panelAngle = i * Mathf.PI * 2f / count;
-            float r = Random.Range(radiusMin, radiusMax);
-
-            Vector3 pos = targetCenterPos + new Vector3(
-                Mathf.Cos(panelAngle) * r,
-                Mathf.Sin(panelAngle) * r,
-                0f
-            );
-
-            GameObject panel = CreatePromptPanel(list[i], pos);
-            spawnedPanels.Add(panel);
-
-            CreateLine(panel.transform.position, centerPanel.transform.position);
+            Debug.LogWarning("[View] TextObjectManager 未找到");
+            return;
         }
 
-        index++;
+        var allTextObjects = TextObjectManager.Instance.GetAllTextObjects();
+
+        foreach (var textObj in allTextObjects)
+        {
+            if (textObj == null) continue;
+
+            var store = textObj.GetComponent<CurrentTextStore>();
+            if (store == null || string.IsNullOrEmpty(store.CurrentText)) continue;
+
+            string prompt = store.CurrentText;
+
+            var targets = TextObjectManager.Instance.GetApplyTargets(textObj);
+
+            foreach (var target in targets)
+            {
+                if (target == null) continue;
+
+                string targetName = target.name;
+
+                if (!grouped.ContainsKey(targetName))
+                    grouped[targetName] = new List<string>();
+
+                grouped[targetName].Add(prompt);
+            }
+        }
+
+        if (grouped.Count == 0)
+        {
+            Debug.Log("[View] 没有任何 Apply 数据");
+            return;
+        }
+
+        HideAllTextObjects();
+
+        Transform cam = Camera.main.transform;
+
+        Vector3 basePos = GetGazePosition(cam);
+        Vector3 right = cam.right;
+        Vector3 up = cam.up;
+
+        int total = grouped.Count;
+        int rows = Mathf.CeilToInt((float)total / maxPerRow);
+
+        int index = 0;
+
+        foreach (var pair in grouped)
+        {
+            int row = index / maxPerRow;
+            int col = index % maxPerRow;
+
+            int currentRowCount = Mathf.Min(maxPerRow, total - row * maxPerRow);
+
+            float totalWidth = (currentRowCount - 1) * rootPanelSpacingX;
+            float totalHeight = (rows - 1) * rootPanelSpacingY;
+
+            float xOffset = col * rootPanelSpacingX - totalWidth / 2f;
+            float yOffset = -(row * rootPanelSpacingY - totalHeight / 2f);
+
+            Vector3 centerPos = basePos + right * xOffset + up * yOffset;
+
+            GameObject centerPanel = CreateCenterPanel(pair.Key, centerPos);
+            spawnedPanels.Add(centerPanel);
+
+            int count = pair.Value.Count;
+
+            for (int i = 0; i < count; i++)
+            {
+                float angle = i * Mathf.PI * 2f / count;
+                float r = Random.Range(radiusMin, radiusMax);
+
+                Vector3 offset =
+                    right * (Mathf.Cos(angle) * r) +
+                    up * (Mathf.Sin(angle) * r);
+
+                Vector3 pos = centerPos + offset;
+
+                GameObject panel = CreatePromptPanel(pair.Value[i], pos);
+                spawnedPanels.Add(panel);
+
+                ConnectDots(panel, centerPanel);
+            }
+
+            index++;
+        }
+
+        Debug.Log("[View] Dot-based Line System Final");
     }
 
-    Debug.Log("[View] Semantic Wall View Spawned (Centered)");
-}
-
-    // =========================
-    // 创建中心 Panel
-    // =========================
-    GameObject CreateCenterPanel(string targetName, Vector3 pos)
+    void ConnectDots(GameObject a, GameObject b)
     {
-        GameObject panel = Instantiate(panelPrefab, pos, Quaternion.identity);
-        panel.transform.forward = Camera.main.transform.forward;
+        Transform dotA = a.transform.Find(dotName);
+        Transform dotB = b.transform.Find(dotName);
 
-        TMP_Text text = panel.GetComponentInChildren<TMP_Text>();
-        if (text != null) text.text = targetName;
+        if (dotA == null || dotB == null)
+        {
+            Debug.LogWarning("[View] Dot not found on panel");
+            return;
+        }
 
-        return panel;
-    }
+        dotA.gameObject.SetActive(true);
+        dotB.gameObject.SetActive(true);
 
-    // =========================
-    // 创建 Prompt Panel
-    // =========================
-    GameObject CreatePromptPanel(InteractionRecord record, Vector3 pos)
-    {
-        GameObject panel = Instantiate(panelPrefab, pos, Quaternion.identity);
-        panel.transform.forward = Camera.main.transform.forward;
-
-        TMP_Text text = panel.GetComponentInChildren<TMP_Text>();
-        if (text != null) text.text = record.prompt;
-
-        return panel;
-    }
-
-    // =========================
-    // 创建线条
-    // =========================
-    void CreateLine(Vector3 a, Vector3 b)
-    {
-        GameObject lineObj = new GameObject("Line");
+        GameObject lineObj = new GameObject("DotConnection");
         LineRenderer lr = lineObj.AddComponent<LineRenderer>();
 
-        lr.material = lineMaterial;
+        Material mat = new Material(Shader.Find("Unlit/Color"));
+        mat.color = lineColor;
+
+        lr.material = mat;
         lr.startColor = lineColor;
         lr.endColor = lineColor;
         lr.startWidth = lineWidth;
         lr.endWidth = lineWidth;
         lr.positionCount = 2;
-        lr.SetPosition(0, a);
-        lr.SetPosition(1, b);
+        lr.useWorldSpace = true;
+
+        LineUpdater updater = lineObj.AddComponent<LineUpdater>();
+        updater.Init(dotA, dotB, lr);
 
         spawnedLines.Add(lineObj);
     }
 
-    // =========================
-    // 隐藏原 Text Objects
-    // =========================
+    Vector3 GetGazePosition(Transform cam)
+    {
+        if (gazeInteractor != null &&
+            gazeInteractor.TryGetCurrent3DRaycastHit(out RaycastHit hit))
+        {
+            return hit.point;
+        }
+
+        return cam.position + cam.forward * spawnDistance;
+    }
+
+    GameObject CreateCenterPanel(string text, Vector3 pos)
+    {
+        GameObject panel = Instantiate(panelPrefab, pos, Quaternion.identity);
+        panel.transform.forward = Camera.main.transform.forward;
+
+        TMP_Text t = panel.GetComponentInChildren<TMP_Text>();
+        if (t != null) t.text = text;
+
+        return panel;
+    }
+
+    GameObject CreatePromptPanel(string prompt, Vector3 pos)
+    {
+        GameObject panel = Instantiate(panelPrefab, pos, Quaternion.identity);
+        panel.transform.forward = Camera.main.transform.forward;
+
+        TMP_Text t = panel.GetComponentInChildren<TMP_Text>();
+        if (t != null) t.text = prompt;
+
+        return panel;
+    }
+
     void HideAllTextObjects()
     {
         foreach (var t in FindObjectsOfType<CurrentTextStore>())
             t.gameObject.SetActive(false);
     }
 
-    // =========================
-    // 显示原 Text Objects
-    // =========================
     void ShowAllTextObjects()
     {
         foreach (var t in FindObjectsOfType<CurrentTextStore>())
             t.gameObject.SetActive(true);
     }
 
-    // =========================
-    // 清理
-    // =========================
     void ClearView()
     {
-        foreach (var p in spawnedPanels) Destroy(p);
-        foreach (var l in spawnedLines) Destroy(l);
+        foreach (var p in spawnedPanels)
+            if (p != null) Destroy(p);
+
+        foreach (var l in spawnedLines)
+            if (l != null) Destroy(l);
+
         spawnedPanels.Clear();
         spawnedLines.Clear();
+
         ShowAllTextObjects();
-        Debug.Log("[View] Cleared");
     }
 
-    // =========================
-    // Mock 数据
-    // =========================
     List<InteractionRecord> GetMockRecords()
     {
-        List<InteractionRecord> mock = new List<InteractionRecord>();
+        return new List<InteractionRecord>
+        {
+            new InteractionRecord("Switch channel","TV"),
+            new InteractionRecord("Turn off after 2 hours","TV"),
+            new InteractionRecord("Increase volume","TV"),
 
-        // TV
-        mock.Add(new InteractionRecord("turn on", "TV"));
-        mock.Add(new InteractionRecord("turn off", "TV"));
-        mock.Add(new InteractionRecord("switch channel", "TV"));
-        mock.Add(new InteractionRecord("turn off after 2 hours", "TV"));
-        mock.Add(new InteractionRecord("increase volume", "TV"));
-        mock.Add(new InteractionRecord("decrease volume", "TV"));
-        mock.Add(new InteractionRecord("mute", "TV"));
+            new InteractionRecord("Reverse","Air Conditioner"),
+            new InteractionRecord("Decrease temperature","Air Conditioner"),
+            new InteractionRecord("Enable eco mode","Air Conditioner"),
 
-        // Air Conditioner
-        mock.Add(new InteractionRecord("turn on", "Air Conditioner"));
-        mock.Add(new InteractionRecord("turn off", "Air Conditioner"));
-        mock.Add(new InteractionRecord("increase temperature", "Air Conditioner"));
-        mock.Add(new InteractionRecord("decrease temperature", "Air Conditioner"));
-        mock.Add(new InteractionRecord("turn off at 2 AM", "Air Conditioner"));
-        mock.Add(new InteractionRecord("set to 24 degrees", "Air Conditioner"));
-        mock.Add(new InteractionRecord("enable eco mode", "Air Conditioner"));
-
-        // Computer
-        mock.Add(new InteractionRecord("send today's schedule to Alex", "Computer"));
-        mock.Add(new InteractionRecord("open email", "Computer"));
-        mock.Add(new InteractionRecord("start meeting", "Computer"));
-        mock.Add(new InteractionRecord("shutdown", "Computer"));
-        mock.Add(new InteractionRecord("restart", "Computer"));
-        mock.Add(new InteractionRecord("open browser", "Computer"));
-
-        // Lamp
-        mock.Add(new InteractionRecord("turn on", "lamp"));
-        mock.Add(new InteractionRecord("turn off", "lamp"));
-        mock.Add(new InteractionRecord("more energetic", "lamp"));
-
-        return mock;
+            new InteractionRecord("Turn on","Lamp"),
+            new InteractionRecord("More energetic","Lamp"),
+        };
     }
 }

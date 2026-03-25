@@ -25,7 +25,6 @@ public class TriggerArea : MonoBehaviour
         {
             Debug.Log("Handle 进入碰撞区域");
 
-            // handle变色
             Renderer rend = other.GetComponent<Renderer>();
             if (rend != null)
             {
@@ -48,7 +47,6 @@ public class TriggerArea : MonoBehaviour
         {
             float pinchValue = pinchAction.action.ReadValue<float>();
 
-            // 检测 pinch release
             if (pinchValue < pinchUpThreshold)
             {
                 hasProcessed = true;
@@ -66,7 +64,6 @@ public class TriggerArea : MonoBehaviour
                     }
                 }
 
-                // 删除 handle 整个父物体
                 Destroy(other.transform.parent.gameObject);
             }
         }

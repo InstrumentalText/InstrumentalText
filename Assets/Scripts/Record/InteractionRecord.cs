@@ -8,7 +8,6 @@ public class InteractionRecord
     public string targetName;
     public float time;
 
-    // 可扩展字段（未来用）
     public string sceneName;
     public Vector3 targetPosition;
 

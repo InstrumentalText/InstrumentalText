@@ -4,14 +4,11 @@ using TMPro;
 
 public class TriggerAreaPromptExecutor : MonoBehaviour
 {
-    [Header("颜色设置")]
     public Color enterColor = Color.red;
     public Color exitColor = Color.white;
 
-    [Header("Prompt UI")]
     public TMP_Text displayText;
 
-    [Header("Pinch Input")]
     public InputActionProperty pinchAction;
     public float pinchDownThreshold = 0.8f;
     public float pinchUpThreshold = 0.2f;
@@ -53,7 +50,6 @@ public class TriggerAreaPromptExecutor : MonoBehaviour
 
         float pinchValue = pinchAction.action.ReadValue<float>();
 
-        // 检测 pinch release
         if (pinchValue < pinchUpThreshold)
         {
             ProcessPrompt();
@@ -64,7 +60,6 @@ public class TriggerAreaPromptExecutor : MonoBehaviour
     {
         if (currentHandle == null) return;
 
-        // ⭐ 从 root 查找 TextObject
         Transform root = currentHandle.transform.root;
 
         CurrentTextStore textStore = root.GetComponent<CurrentTextStore>();
@@ -93,7 +88,6 @@ public class TriggerAreaPromptExecutor : MonoBehaviour
             llmProcessor.ProcessPrompt(gameObject, prompt);
         }
 
-        // 删除整个 TextObject
         Destroy(root.gameObject);
     }
 

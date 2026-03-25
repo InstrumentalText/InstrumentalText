@@ -4,7 +4,6 @@ public class SimplePromptTriggerOnDevice : MonoBehaviour
 {
     private LLMProcessorOnDevice llmProcessor;
 
-    // 防止 OnTriggerStay 每帧重复执行
     private bool hasTriggered = false;
 
     private void Start()
@@ -45,7 +44,6 @@ public class SimplePromptTriggerOnDevice : MonoBehaviour
 
         Debug.Log($"[SimplePromptTriggerOnDevice] Checking collider: {other.name}");
 
-        // ⭐ 找到整个 TextObject prefab 的 root
         Transform root = other.transform.root;
 
         Debug.Log($"[SimplePromptTriggerOnDevice] Root object: {root.name}");

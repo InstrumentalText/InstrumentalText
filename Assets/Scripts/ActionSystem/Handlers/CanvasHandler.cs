@@ -5,16 +5,18 @@ using Newtonsoft.Json.Linq;
 
 public class CanvasHandler : MonoBehaviour, IActionHandler
 {
-    [SerializeField] private string compareWithFileName;
-    [SerializeField] private string comparisonResultFileName;
-    [SerializeField] private GameObject comparisonResultPrefab;
-    [SerializeField] private Vector3 comparisonSpawnOffset = new Vector3(5f, 0f, 0f);
+    [Header("Compare setup")]
+    [Tooltip("Compare 结果直接放预制体，Inspector 填好即可")]
+    [SerializeField] private GameObject compareResultObject;
+    [SerializeField] private Vector3 compareSpawnOffset = new Vector3(5f, 0f, 0f);
 
     private MarkdownRenderer markdownRenderer;
 
     private void Awake()
     {
         markdownRenderer = GetComponent<MarkdownRenderer>();
+        if (markdownRenderer == null)
+            Debug.LogWarning("[CanvasHandler] MarkdownRenderer not found on this GameObject.");
     }
 
     private static readonly List<ActionSpec> actionSpecs = new()
@@ -25,10 +27,7 @@ public class CanvasHandler : MonoBehaviour, IActionHandler
             summary = "Go to the previous page",
             description = "Navigate to the previous page of the document displayed on this canvas.",
             args = new List<ArgSpec>(),
-            examples = new List<string>
-            {
-                "{\"type\":\"canvas.page_up\",\"args\":{}}"
-            }
+            examples = new List<string> { "{\"type\":\"canvas.page_up\",\"args\":{}}" }
         },
         new ActionSpec
         {
@@ -36,21 +35,15 @@ public class CanvasHandler : MonoBehaviour, IActionHandler
             summary = "Go to the next page",
             description = "Navigate to the next page of the document displayed on this canvas.",
             args = new List<ArgSpec>(),
-            examples = new List<string>
-            {
-                "{\"type\":\"canvas.page_down\",\"args\":{}}"
-            }
+            examples = new List<string> { "{\"type\":\"canvas.page_down\",\"args\":{}}" }
         },
         new ActionSpec
         {
             type = "canvas.compare_texts",
-            summary = "Compare this document with another, generate explaination and analysis",
-            description = "Analyze the current document and a second document, then produce a summary highlighting their shared themes and key commonalities. The result is displayed on a new canvas.",
+            summary = "Compare this document with another, display prepared result",
+            description = "Display the comparison result (prepared in Inspector) on a new canvas.",
             args = new List<ArgSpec>(),
-            examples = new List<string>
-            {
-                "{\"type\":\"canvas.compare_texts\",\"args\":{}}"
-            }
+            examples = new List<string> { "{\"type\":\"canvas.compare_texts\",\"args\":{}}" }
         },
         new ActionSpec
         {
@@ -68,17 +61,11 @@ public class CanvasHandler : MonoBehaviour, IActionHandler
                     constraints = new ArgConstraints { min = 1 }
                 }
             },
-            examples = new List<string>
-            {
-                "{\"type\":\"canvas.go_to_page\",\"args\":{\"page\":3}}"
-            }
+            examples = new List<string> { "{\"type\":\"canvas.go_to_page\",\"args\":{\"page\":3}}" }
         }
     };
 
-    public IReadOnlyList<ActionSpec> GetActionSpecs()
-    {
-        return actionSpecs;
-    }
+    public IReadOnlyList<ActionSpec> GetActionSpecs() => actionSpecs;
 
     public bool CanHandle(string actionType)
     {
@@ -97,49 +84,53 @@ public class CanvasHandler : MonoBehaviour, IActionHandler
         try { argsObj = JObject.Parse(argsJson ?? "{}"); }
         catch (Exception e) { return new ActionResult { success = false, errorCode = "INVALID_JSON", message = e.Message }; }
 
-        if (actionType == "canvas.compare_texts")
-            return ExecuteCompare();
-
-        int page;
         switch (actionType)
         {
             case "canvas.page_up":
-                page = markdownRenderer.CurrentPage - 1;
-                break;
+                markdownRenderer.PreviousPage();
+                HideCompare();
+                return new ActionResult { success = true, message = $"Now on page {markdownRenderer.CurrentPage}/{markdownRenderer.TotalPages}" };
+
             case "canvas.page_down":
-                page = markdownRenderer.CurrentPage + 1;
-                break;
+                markdownRenderer.NextPage();
+                HideCompare();
+                return new ActionResult { success = true, message = $"Now on page {markdownRenderer.CurrentPage}/{markdownRenderer.TotalPages}" };
+
             case "canvas.go_to_page":
                 var pageToken = argsObj["page"];
                 if (pageToken == null)
                     return new ActionResult { success = false, errorCode = "MISSING_ARG", message = "Missing required argument: page" };
-                page = pageToken.Value<int>();
-                break;
+
+                markdownRenderer.GoToPage(pageToken.Value<int>());
+                HideCompare();
+                return new ActionResult { success = true, message = $"Now on page {markdownRenderer.CurrentPage}/{markdownRenderer.TotalPages}" };
+
+            case "canvas.compare_texts":
+                return ExecuteCompare();
+
             default:
                 return new ActionResult { success = false, errorCode = "UNKNOWN_ACTION", message = $"Unsupported action: {actionType}" };
         }
-
-        if (page < 1 || page > markdownRenderer.TotalPages)
-            return new ActionResult { success = false, errorCode = "OUT_OF_RANGE", message = $"Page {page} out of range (1-{markdownRenderer.TotalPages})." };
-
-        markdownRenderer.GoToPage(page);
-        return new ActionResult { success = true, errorCode = "", message = $"Now on page {markdownRenderer.CurrentPage}/{markdownRenderer.TotalPages}" };
     }
 
     private ActionResult ExecuteCompare()
     {
-        if (comparisonResultPrefab == null)
-            return new ActionResult { success = false, errorCode = "NO_PREFAB", message = "Comparison result prefab is not assigned." };
+        if (compareResultObject == null)
+            return new ActionResult { success = false, errorCode = "NO_PREFAB", message = "Compare result object is not assigned." };
 
-        if (string.IsNullOrEmpty(comparisonResultFileName))
-            return new ActionResult { success = false, errorCode = "NO_RESULT_FILE", message = "Comparison result file name is not assigned." };
+        // ✅ 直接激活 prefab，内容由 prefab 内部管理
+        compareResultObject.SetActive(true);
+        compareResultObject.transform.position = transform.position + compareSpawnOffset;
+        compareResultObject.transform.rotation = transform.rotation;
 
-        var instance = Instantiate(comparisonResultPrefab, transform.position + comparisonSpawnOffset, transform.rotation);
-        var renderer = instance.GetComponent<MarkdownRenderer>();
-        if (renderer == null)
-            return new ActionResult { success = false, errorCode = "NO_RENDERER", message = "Prefab does not have a MarkdownRenderer component." };
+        Debug.Log("[CanvasHandler] Compare prefab activated");
 
-        renderer.LoadMarkdown(comparisonResultFileName);
-        return new ActionResult { success = true, errorCode = "", message = $"Comparison result loaded: {comparisonResultFileName}" };
+        return new ActionResult { success = true, message = "Compare result displayed." };
+    }
+
+    private void HideCompare()
+    {
+        if (compareResultObject != null)
+            compareResultObject.SetActive(false);
     }
 }

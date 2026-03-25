@@ -6,6 +6,7 @@ TagManager:
   tags:
   - TextObject
   - GazeInteractor
+  - ItemText
   layers:
   - Default
   - TransparentFX

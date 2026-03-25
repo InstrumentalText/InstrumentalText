@@ -17,14 +17,12 @@ public class GazeHoverOutline : MonoBehaviour
         outline.OutlineWidth = outlineWidth;
     }
 
-    // 被 gaze 命中 → 高亮
     public void ApplyHighlight()
     {
         if (outline != null)
             outline.enabled = true;
     }
 
-    // gaze 离开 → 取消高亮
     public void RemoveHighlight()
     {
         if (outline != null)

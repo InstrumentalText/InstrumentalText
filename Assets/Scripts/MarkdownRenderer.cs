@@ -1,14 +1,15 @@
-using System.IO;
 using UnityEngine;
 using TMPro;
+using System.Collections.Generic;
 
 public class MarkdownRenderer : MonoBehaviour
 {
-    [SerializeField] private string markdownFileName;
+    [Header("每个元素就是一页 Markdown 内容")]
+    [TextArea(5, 20)]
+    [SerializeField] private List<string> pageContents;
 
     private TextMeshProUGUI tmp;
-    private int currentPage = 1;
-    private int totalPages = 1;
+    private int currentPageIndex = 0;
 
     void Awake()
     {
@@ -19,58 +20,73 @@ public class MarkdownRenderer : MonoBehaviour
 
     void Start()
     {
-        if (!string.IsNullOrEmpty(markdownFileName))
-            LoadMarkdown(markdownFileName);
+        if (pageContents != null && pageContents.Count > 0)
+            LoadPage(0);
     }
 
-    public void LoadMarkdown(string fileName)
+    /// <summary>
+    /// 渲染指定页
+    /// </summary>
+    public void LoadPage(int index)
     {
-        string path = Path.Combine(Application.streamingAssetsPath, fileName);
-        if (!File.Exists(path))
-        {
-            Debug.LogWarning($"[MarkdownRenderer] Markdown file not found: {path}");
-            return;
-        }
+        if (tmp == null || pageContents == null || pageContents.Count == 0) return;
 
-        string raw = File.ReadAllText(path);
-        string richText = MarkdownToTMP.Convert(raw);
+        index = Mathf.Clamp(index, 0, pageContents.Count - 1);
+        currentPageIndex = index;
 
-        if (tmp != null)
-        {
-            tmp.text = richText;
-            tmp.textWrappingMode = TextWrappingModes.Normal;
-            tmp.overflowMode = TextOverflowModes.Page;
+        string richText = MarkdownToTMP.Convert(pageContents[index]); // Markdown 转 TMP 方法
+        tmp.text = richText;
 
-            tmp.ForceMeshUpdate();
-            totalPages = tmp.textInfo.pageCount;
-            currentPage = 1;
-            tmp.pageToDisplay = currentPage;
+        tmp.textWrappingMode = TextWrappingModes.Normal;
+        tmp.overflowMode = TextOverflowModes.Page;
 
-            Debug.Log($"[MarkdownRenderer] Loaded {fileName}: {totalPages} page(s)");
-        }
+        tmp.ForceMeshUpdate();
+        tmp.pageToDisplay = 1; // TMP 每次只显示第一页
+    }
+
+    /// <summary>
+    /// 直接用字符串内容渲染（CanvasHandler 调用）
+    /// </summary>
+    public void LoadMarkdownFromString(string content)
+    {
+        if (tmp == null) return;
+
+        string richText = MarkdownToTMP.Convert(content);
+        tmp.text = richText;
+
+        tmp.textWrappingMode = TextWrappingModes.Normal;
+        tmp.overflowMode = TextOverflowModes.Page;
+        tmp.ForceMeshUpdate();
+        tmp.pageToDisplay = 1;
     }
 
     public void NextPage()
     {
-        if (tmp == null || currentPage >= totalPages) return;
-        currentPage++;
-        tmp.pageToDisplay = currentPage;
+        if (currentPageIndex + 1 >= pageContents.Count) return;
+        LoadPage(currentPageIndex + 1);
     }
 
     public void PreviousPage()
     {
-        if (tmp == null || currentPage <= 1) return;
-        currentPage--;
-        tmp.pageToDisplay = currentPage;
+        if (currentPageIndex <= 0) return;
+        LoadPage(currentPageIndex - 1);
     }
 
-    public void GoToPage(int page)
+    public void GoToPage(int page) // 1-based
     {
-        if (tmp == null) return;
-        currentPage = Mathf.Clamp(page, 1, totalPages);
-        tmp.pageToDisplay = currentPage;
+        LoadPage(page - 1);
     }
 
-    public int CurrentPage => currentPage;
-    public int TotalPages => totalPages;
+    public int CurrentPage => currentPageIndex + 1;
+    public int TotalPages => pageContents?.Count ?? 0;
+
+    /// <summary>
+    /// 可在 CanvasHandler 里动态注入多页内容
+    /// </summary>
+    public void SetPageContents(List<string> contents)
+    {
+        pageContents = contents;
+        if (pageContents != null && pageContents.Count > 0)
+            LoadPage(0);
+    }
 }

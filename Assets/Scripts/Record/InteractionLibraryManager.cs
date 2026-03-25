@@ -23,9 +23,7 @@ public class InteractionLibraryManager : MonoBehaviour
         Debug.Log("[Library] Manager Initialized");
     }
 
-    // =========================
-    // ADD RECORD
-    // =========================
+
     public void AddRecord(string prompt, string targetName, GameObject target = null)
     {
         if (string.IsNullOrEmpty(prompt) || string.IsNullOrEmpty(targetName))
@@ -40,9 +38,6 @@ public class InteractionLibraryManager : MonoBehaviour
         Debug.Log($"[Library] Added: {prompt} → {targetName}");
     }
 
-    // =========================
-    // GETTERS（给 Library / Search / View 用）
-    // =========================
 
     public List<InteractionRecord> GetAllRecords()
     {
@@ -59,9 +54,7 @@ public class InteractionLibraryManager : MonoBehaviour
         return records.FindAll(r => r.prompt.ToLower().Contains(keyword.ToLower()));
     }
 
-    // =========================
-    // DEBUG（可选）
-    // =========================
+
 
     [ContextMenu("Print All Records")]
     public void PrintAllRecords()
@@ -74,9 +67,7 @@ public class InteractionLibraryManager : MonoBehaviour
         }
     }
 
-    // =========================
-    // CLEAR（测试用）
-    // =========================
+
 
     public void Clear()
     {

@@ -4,7 +4,6 @@ public class SimplePromptTrigger : MonoBehaviour
 {
     private LLMProcessor llmProcessor;
 
-    // 防止 OnTriggerStay 每帧重复执行
     private bool hasTriggered = false;
 
     private void Start()
@@ -13,11 +12,11 @@ public class SimplePromptTrigger : MonoBehaviour
 
         if (llmProcessor == null)
         {
-            Debug.LogError("[SimplePromptTrigger] ❌ LLMProcessor NOT FOUND in scene!");
+            Debug.LogError("[SimplePromptTrigger]  LLMProcessor NOT FOUND in scene!");
         }
         else
         {
-            Debug.Log("[SimplePromptTrigger] ✅ LLMProcessor connected.");
+            Debug.Log("[SimplePromptTrigger]  LLMProcessor connected.");
         }
     }
 
@@ -45,7 +44,6 @@ public class SimplePromptTrigger : MonoBehaviour
 
         Debug.Log($"[SimplePromptTrigger] Checking collider: {other.name}");
 
-        // ⭐ 找到整个 TextObject prefab 的 root
         Transform root = other.transform.root;
 
         Debug.Log($"[SimplePromptTrigger] Root object: {root.name}");
@@ -54,7 +52,7 @@ public class SimplePromptTrigger : MonoBehaviour
 
         if (textStore == null)
         {
-            Debug.LogWarning("[SimplePromptTrigger] ❌ No CurrentTextStore found on ROOT object.");
+            Debug.LogWarning("[SimplePromptTrigger]  No CurrentTextStore found on ROOT object.");
             return;
         }
 
@@ -68,7 +66,7 @@ public class SimplePromptTrigger : MonoBehaviour
             return;
         }
 
-        Debug.Log($"[SimplePromptTrigger] 🚀 Sending prompt to LLM: {prompt}");
+        Debug.Log($"[SimplePromptTrigger]  Sending prompt to LLM: {prompt}");
 
         if (llmProcessor != null)
         {
@@ -77,7 +75,7 @@ public class SimplePromptTrigger : MonoBehaviour
         }
         else
         {
-            Debug.LogError("[SimplePromptTrigger] ❌ LLMProcessor is NULL when sending prompt.");
+            Debug.LogError("[SimplePromptTrigger]  LLMProcessor is NULL when sending prompt.");
         }
     }
 }
