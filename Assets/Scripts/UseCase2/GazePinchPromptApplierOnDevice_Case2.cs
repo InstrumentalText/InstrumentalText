@@ -123,6 +123,7 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
         Debug.Log("[Applier] Exit Apply Mode");
     }
 
+
     public void ApplyPromptToTarget(GameObject target)
     {
         if (target == null || textRoot == null)
@@ -153,12 +154,17 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
         {
             TextObjectManager.Instance.RegisterTextObject(textRoot);
             TextObjectManager.Instance.AddApplyTarget(textRoot, target);
-            //TODO:修改线条为Text notification
-            TextObjectManager.Instance.ShowLineBetween(textRoot, target);
+        }
+
+
+        var handler = target.GetComponent<TextNotificationHandler>();
+        if (handler != null)
+        {
+            handler.RefreshNotifications();
         }
         else
         {
-            Debug.LogWarning("[Applier] TextObjectManager 不存在");
+            Debug.LogWarning("[Applier] Target missing TextNotificationHandler");
         }
 
         applyMode = false;
@@ -171,7 +177,6 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
 
         Debug.Log("[Applier] Apply Completed");
     }
-
     
     public void SetCurrentTarget(GameObject target) => currentTarget = target;
     public GameObject GetCurrentTarget() => currentTarget;

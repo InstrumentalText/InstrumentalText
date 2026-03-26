@@ -186,7 +186,21 @@ public class TextObjectManager : MonoBehaviour
         spawnedLines.Add(lineObj);
     }
 
+    //查询object的所有应用过的text
+    public List<GameObject> GetTextObjectsByTarget(GameObject target)
+    {
+        List<GameObject> result = new List<GameObject>();
 
+        foreach (var pair in applyMap)
+        {
+            if (pair.Value.Contains(target))
+            {
+                result.Add(pair.Key);
+            }
+        }
+
+        return result;
+    }
     public void ShowLineBetween(GameObject textObj, GameObject target)
     {
         if (textObj == null || target == null) return;
