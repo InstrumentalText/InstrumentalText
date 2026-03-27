@@ -74,54 +74,6 @@ public class TextNotificationHandler : MonoBehaviour
     }
 
 
-    // public void ShowAllNotifications()
-    // {
-    //     var applier = GazePinchPromptApplierOnDevice_Case2.ActiveInstance;
-    //     if (applier != null && applier.IsApplyMode())
-    //     {
-    //         Debug.Log("[Notification] Hover ignored → currently in Apply Mode");
-    //         return;
-    //     }
-
-    //     Debug.Log("[Notification] Hover Mode → Showing all notifications");
-
-    //     ClearAll();
-
-    //     if (dot == null)
-    //     {
-    //         Debug.LogWarning("[Notification] Dot 未绑定！");
-    //         return;
-    //     }
-
-    //     if (!dot.gameObject.activeSelf)
-    //         dot.gameObject.SetActive(true);
-
-    //     var textObjs = TextObjectManager.Instance.GetTextObjectsByTarget(gameObject);
-
-    //     Vector3 currentOffset = firstOffset;
-
-    //     for (int i = 0; i < textObjs.Count; i++)
-    //     {
-    //         var textObj = textObjs[i];
-    //         if (textObj == null) continue;
-
-    //         var store = textObj.GetComponent<CurrentTextStore>();
-    //         if (store == null || string.IsNullOrEmpty(store.CurrentText)) continue;
-
-    //         GameObject ui = Instantiate(textNotificationPrefab);
-    //         ui.transform.position = GetWorldPositionFromDot(currentOffset);
-    //         FaceCamera(ui);
-
-    //         TMP_Text t = ui.GetComponentInChildren<TMP_Text>();
-    //         if (t != null)
-    //             t.text = store.CurrentText;
-
-    //         spawnedTexts.Add(ui);
-
-    //         currentOffset += stackOffset;
-    //     }
-    // }
-
 
     public void ShowAllNotifications()
     {
@@ -144,7 +96,6 @@ public class TextNotificationHandler : MonoBehaviour
 
         var textObjs = TextObjectManager.Instance.GetTextObjectsByTarget(gameObject);
 
-        // ✅ 先筛选出有效文本
         List<string> validTexts = new List<string>();
 
         foreach (var textObj in textObjs)
@@ -157,7 +108,6 @@ public class TextNotificationHandler : MonoBehaviour
             validTexts.Add(store.CurrentText);
         }
 
-        // ❗如果没有任何有效文本 → 不显示 Dot，直接退出
         if (validTexts.Count == 0)
         {
             Debug.Log("[Notification] No valid text → Dot hidden");
@@ -166,13 +116,11 @@ public class TextNotificationHandler : MonoBehaviour
             return;
         }
 
-        // ✅ 有内容才显示 Dot
         if (!dot.gameObject.activeSelf)
             dot.gameObject.SetActive(true);
 
         Vector3 currentOffset = firstOffset;
 
-        // ✅ 再生成 UI
         foreach (var text in validTexts)
         {
             GameObject ui = Instantiate(textNotificationPrefab);

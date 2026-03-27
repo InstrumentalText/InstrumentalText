@@ -9,19 +9,16 @@ public class HandlerSelectionController : MonoBehaviour
     private Behaviour[] currentRaycasters;
     private Behaviour gazePinchApplier;
 
-    /// <summary>
-    /// Handler 被选中时调用（XR Grab Interactable Select Enter）
-    /// </summary>
+
     public void OnSelected()
     {
         if (currentTextObject == null) return;
 
-        // 1. 禁用 GazePinchPromptApplier
         // gazePinchApplier = currentTextObject.GetComponent<GazePinchPromptApplierOnDevice_Case2>();
         // if (gazePinchApplier != null)
         //     gazePinchApplier.enabled = false;
 
-        // 2. 禁用所有 Collider
+  
         currentColliders = currentTextObject.GetComponentsInChildren<Collider>();
         foreach (var col in currentColliders)
         {
@@ -29,7 +26,6 @@ public class HandlerSelectionController : MonoBehaviour
                 col.enabled = false;
         }
 
-        // 3. 禁用 TrackedDeviceGraphicRaycaster
         currentRaycasters = currentTextObject.GetComponentsInChildren<Behaviour>();
         foreach (var b in currentRaycasters)
         {
@@ -40,18 +36,14 @@ public class HandlerSelectionController : MonoBehaviour
         Debug.Log("[Handler] Selected -> 已禁用 TextObject 交互组件");
     }
 
-    /// <summary>
-    /// Handler 取消选中时调用（XR Grab Interactable Select Exit）
-    /// </summary>
     public void OnDeselected()
     {
         if (currentTextObject == null) return;
 
-        // // 1. 恢复 GazePinchPromptApplier
         // if (gazePinchApplier != null)
         //     gazePinchApplier.enabled = true;
 
-        // 2. 恢复 Collider
+
         if (currentColliders != null)
         {
             foreach (var col in currentColliders)
@@ -61,7 +53,6 @@ public class HandlerSelectionController : MonoBehaviour
             }
         }
 
-        // 3. 恢复 Raycaster
         if (currentRaycasters != null)
         {
             foreach (var b in currentRaycasters)
