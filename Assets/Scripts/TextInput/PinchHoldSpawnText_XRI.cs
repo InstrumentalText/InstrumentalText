@@ -309,20 +309,13 @@ public class PinchHoldSpawnText_XRI : MonoBehaviour
         return newText;
     }
 
+
     void FollowHand(GameObject obj)
     {
         Camera cam = Camera.main;
         if (cam == null || obj == null) return;
 
-        float gazeY = cam.transform.position.y;
-        if (gazeInteractor != null &&
-            gazeInteractor.TryGetCurrent3DRaycastHit(out RaycastHit hit))
-        {
-            gazeY = hit.point.y;
-        }
-
         Vector3 targetPos = cam.transform.position + cam.transform.forward * spawnDistance;
-        targetPos.y = gazeY;
 
         obj.transform.position = targetPos;
         obj.transform.rotation = Quaternion.LookRotation(cam.transform.forward);
