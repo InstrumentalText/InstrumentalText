@@ -90,7 +90,7 @@ public class SearchBarHandler : MonoBehaviour
     }
 
 
-    void ClearAllHighlights()
+    public void ClearAllHighlights()
     {
         if (TextObjectManager.Instance == null) return;
 

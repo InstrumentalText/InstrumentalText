@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
-
+using TMPro;
 
 public class SearchModeHandler : MonoBehaviour
 {
@@ -11,6 +11,10 @@ public class SearchModeHandler : MonoBehaviour
     [Header("References")]
     public GameObject searchBar;
     public float searchBarDistance = 1f;
+
+    [Header("SearchBar Logic")]
+    public SearchBarHandler searchBarHandler; 
+    public CurrentTextStore currentTextStore; 
 
     [Header("Pinch Settings")]
     public InputActionProperty pinchAction;
@@ -49,7 +53,6 @@ public class SearchModeHandler : MonoBehaviour
             targetButton.OnModeStateChanged -= HandleModeChanged;
     }
 
-
     private void HandleModeChanged(bool active)
     {
         isModeActive = active;
@@ -57,34 +60,60 @@ public class SearchModeHandler : MonoBehaviour
         if (debug)
             Debug.Log($"[SearchModeHandler] Mode 状态 → {(active ? "激活" : "关闭")}");
 
-        if (isModeActive)
+        if (TextObjectManager.Instance != null)
         {
-            if (TextObjectManager.Instance != null)
+            if (active)
             {
                 TextObjectManager.Instance.ShowAll();
 
+                // 搜索模式 → 启用 DotFollower
+                SetDotFollowersActive(true);
+
                 if (debug)
-                    Debug.Log("[SearchModeHandler] 显示 TextObject + 恢复所有连线");
+                    Debug.Log("[SearchModeHandler] 显示 TextObject + 启用 DotFollower");
             }
-        }
-        else
-        {
-            if (TextObjectManager.Instance != null)
+            else
             {
                 TextObjectManager.Instance.HideAll();
 
-                if (debug)
-                    Debug.Log("[SearchModeHandler] 隐藏所有 TextObject");
-            }
+                // 退出搜索模式 → 禁用 DotFollower
+                SetDotFollowersActive(false);
 
-            if (searchBarShown && searchBar != null)
-            {
-                searchBar.SetActive(false);
-                searchBarShown = false;
+                ClearSearchInput();
+
+                if (searchBarHandler != null)
+                {
+                    searchBarHandler.ClearAllHighlights();
+                    if (debug)
+                        Debug.Log("[SearchModeHandler] 清除所有高亮");
+                }
+
+                if (searchBarShown && searchBar != null)
+                {
+                    searchBar.SetActive(false);
+                    searchBarShown = false;
+                }
             }
         }
     }
 
+    private void SetDotFollowersActive(bool active)
+    {
+        if (TextObjectManager.Instance == null) return;
+
+        foreach (var textObj in TextObjectManager.Instance.GetAllTextObjects())
+        {
+            if (textObj == null) continue;
+
+            // 获取 TextObject 下所有 DotFollower 并激活/禁用
+            var dotFollowers = textObj.GetComponentsInChildren<DotFollower>(true);
+            foreach (var df in dotFollowers)
+            {
+                if (df != null)
+                    df.enabled = active;
+            }
+        }
+    }
 
     private void Update()
     {
@@ -106,7 +135,6 @@ public class SearchModeHandler : MonoBehaviour
         }
     }
 
-
     void ShowSearchBar()
     {
         if (searchBar == null) return;
@@ -121,5 +149,29 @@ public class SearchModeHandler : MonoBehaviour
             Quaternion.LookRotation(cam.transform.forward);
 
         searchBar.SetActive(true);
+    }
+
+    void ClearSearchInput()
+    {
+        if (currentTextStore != null)
+        {
+            currentTextStore.CurrentText = "";
+        }
+
+        if (searchBar != null)
+        {
+            Transform inputFieldTransform = searchBar.transform.Find("canvas/InputField (TMP)");
+            if (inputFieldTransform != null)
+            {
+                TMP_InputField inputField = inputFieldTransform.GetComponent<TMP_InputField>();
+                if (inputField != null)
+                {
+                    inputField.text = "";
+                }
+            }
+        }
+
+        if (debug)
+            Debug.Log("[SearchModeHandler] 清空 SearchBar 输入内容");
     }
 }

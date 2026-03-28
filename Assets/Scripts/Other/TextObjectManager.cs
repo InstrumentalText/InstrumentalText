@@ -23,13 +23,10 @@ public class TextObjectManager : MonoBehaviour
     public string dotName = "Dot";
 
     [Header("Line Settings")]
-    [Tooltip("拖拽你的虚线材质，Shader建议使用Unlit/Transparent或Particles/Standard Unlit")]
     public Material lineMaterial;
 
-    [Tooltip("线宽，可调节")]
     public float lineWidth = 0.1f;
 
-    [Tooltip("虚线单元长度，影响贴图重复次数，可调节")]
     public float tileLength = 1f;
 
     private void Awake()
@@ -143,6 +140,44 @@ public class TextObjectManager : MonoBehaviour
         spawnedLines.Clear();
     }
 
+    // private void ConnectDots(GameObject a, GameObject b)
+    // {
+    //     Transform dotA = a.transform.Find(dotName);
+    //     Transform dotB = b.transform.Find(dotName);
+
+    //     if (dotA == null || dotB == null)
+    //     {
+    //         Debug.LogWarning("[Dot] Dot not found");
+    //         return;
+    //     }
+
+    //     dotA.gameObject.SetActive(true);
+    //     dotB.gameObject.SetActive(true);
+
+    //     GameObject lineObj = new GameObject("DotConnection");
+    //     LineRenderer lr = lineObj.AddComponent<LineRenderer>();
+
+    //     if (lineMaterial != null)
+    //     {
+    //         lr.material = lineMaterial;
+    //     }
+    //     else
+    //     {
+    //         Debug.LogWarning("[Dot] LineMaterial 未设置！");
+    //     }
+
+    //     lr.positionCount = 2;
+    //     lr.useWorldSpace = true;
+    //     lr.textureMode = LineTextureMode.Tile;
+
+    //     lr.startWidth = lr.endWidth = lineWidth;
+
+    //     var updater = lineObj.AddComponent<LineUpdater>();
+    //     updater.Init(dotA, dotB, lr, tileLength);
+
+    //     spawnedLines.Add(lineObj);
+    // }
+
     private void ConnectDots(GameObject a, GameObject b)
     {
         Transform dotA = a.transform.Find(dotName);
@@ -153,6 +188,11 @@ public class TextObjectManager : MonoBehaviour
             Debug.LogWarning("[Dot] Dot not found");
             return;
         }
+
+        var dfA = dotA.GetComponent<DotFollower>();
+        var dfB = dotB.GetComponent<DotFollower>();
+        if (dfA != null) dfA.enabled = false;
+        if (dfB != null) dfB.enabled = false;
 
         dotA.gameObject.SetActive(true);
         dotB.gameObject.SetActive(true);
@@ -180,6 +220,7 @@ public class TextObjectManager : MonoBehaviour
 
         spawnedLines.Add(lineObj);
     }
+
 
     public List<GameObject> GetTextObjectsByTarget(GameObject target)
     {

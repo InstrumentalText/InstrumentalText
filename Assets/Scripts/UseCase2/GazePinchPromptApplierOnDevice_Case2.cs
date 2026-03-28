@@ -25,7 +25,6 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
     [Header("Dot Connection")]
     public string dotName = "Dot";
 
- 
     public Material lineMaterial;
 
     private bool applyMode = false;
@@ -38,6 +37,10 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
     private GameObject currentTarget = null;
 
     private List<GameObject> spawnedLines = new List<GameObject>();
+
+    private List<GazePinchPromptApplierOnDevice_Case2> disabledAppliers = new List<GazePinchPromptApplierOnDevice_Case2>();
+
+    private List<Behaviour> disabledRaycasters = new List<Behaviour>();
 
     void Start()
     {
@@ -54,7 +57,6 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
     {
         float pinchValue = pinchAction.action.ReadValue<float>();
 
-        // Phase 1: 进入 ApplyMode
         if (!applyMode)
         {
             if (IsGazingThisObject() && pinchValue > pinchDownThreshold)
@@ -75,7 +77,6 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
             return;
         }
 
-        // Phase 2: Pinch 释放 → Apply
         if (pinchActive && pinchValue < pinchUpThreshold)
         {
             if (currentTarget != null)
@@ -106,35 +107,118 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
 
         Debug.Log($"[Applier] Apply Mode Entered: {gameObject.name}");
 
+        // ✅ 禁用其他 Applier
+        DisableOtherTextObjectAppliers();
+
+        // ✅ 禁用所有 TextObject 的 Raycaster（包括自己）
+        DisableAllRaycasters();
+
         if (textRoot != null)
             StartCoroutine(BounceTextObject(textRoot, scaleFactor, bounceTimes, bounceDuration));
     }
 
     void ExitApplyModeWithoutApply()
     {
-        applyMode = false;
-        pinchActive = false;
-
-        if (ActiveInstance == this)
-            ActiveInstance = null;
-
-        currentTarget = null;
-
+        ExitApplyModeCommon();
         Debug.Log("[Applier] Exit Apply Mode");
     }
 
+    // public void ApplyPromptToTarget(GameObject target)
+    // {
+    //     if (target == null || textRoot == null)
+    //     {
+    //         Debug.LogWarning("[Applier] target or textRoot null");
+    //         return;
+    //     }
 
+    //     CurrentTextStore textStore = textRoot.GetComponent<CurrentTextStore>();
+    //     if (textStore == null || string.IsNullOrEmpty(textStore.CurrentText))
+    //     {
+    //         Debug.LogWarning("[Applier] CurrentText empty");
+    //         return;
+    //     }
+
+    //     bool isTextObjectPlane = target.CompareTag("TextObjectPlane");
+
+    //     if (!isTextObjectPlane)
+    //     {
+    //         if (llmProcessor == null)
+    //         {
+    //             Debug.LogWarning("[Applier] LLMProcessor not found");
+    //             return;
+    //         }
+
+    //         string prompt = textStore.CurrentText;
+    //         Debug.Log($"[Applier] Applying '{prompt}' to {target.name} (normal object)");
+    //         llmProcessor.ProcessPrompt(target, prompt);
+    //     }
+    //     else
+    //     {
+    //         if (llmProcessor == null)
+    //         {
+    //             Debug.LogWarning("[Applier] LLMProcessor not found");
+    //             return;
+    //         }
+
+    //         string finalAction = "turn off";
+    //         Debug.Log($"[Applier] [TextObjectPlane] Using action: {finalAction}");
+
+    //         GameObject textObjectRoot = target.transform.parent != null ? target.transform.parent.gameObject : null;
+
+    //         if (textObjectRoot == null || !textObjectRoot.CompareTag("TextObject"))
+    //         {
+    //             Debug.LogWarning("[Applier] Cannot find TextObject root for target: " + target.name);
+    //             return;
+    //         }
+
+
+    //         List<GameObject> appliedObjects = TextObjectManager.Instance.GetApplyTargets(textObjectRoot);
+
+    //         if (appliedObjects == null || appliedObjects.Count == 0)
+    //         {
+    //             Debug.Log("[Applier] No previously registered apply objects for this TextObject root: " + textObjectRoot.name);
+    //         }
+
+    //         foreach (var appliedTarget in appliedObjects)
+    //         {
+    //             if (appliedTarget == null) continue;
+
+    //             Debug.Log($"[Applier] Applying action '{finalAction}' to applied target: {appliedTarget.name}");
+    //             llmProcessor.ProcessPrompt(appliedTarget, finalAction);
+
+    //             // 注册已处理对象
+    //             TextObjectManager.Instance.AddApplyTarget(textObjectRoot, appliedTarget);
+    //         }
+
+    //         // 最后处理 target 本身并注册
+    //         if (!appliedObjects.Contains(target))
+    //         {
+    //             llmProcessor.ProcessPrompt(target, finalAction);
+    //             TextObjectManager.Instance.AddApplyTarget(textObjectRoot, target);
+    //         }
+    //     }
+
+    //     // 刷新通知
+    //     var handler = target.GetComponent<TextNotificationHandler>();
+    //     if (handler != null)
+    //     {
+    //         handler.RefreshNotifications();
+    //     }
+    //     else
+    //     {
+    //         Debug.LogWarning("[Applier] Target missing TextNotificationHandler");
+    //     }
+
+    //     // ✅ 退出 applyMode
+    //     ExitApplyModeCommon();
+
+    //     Debug.Log("[Applier] Apply Completed");
+    // }
     public void ApplyPromptToTarget(GameObject target)
     {
         if (target == null || textRoot == null)
         {
             Debug.LogWarning("[Applier] target or textRoot null");
-            return;
-        }
-
-        if (llmProcessor == null)
-        {
-            Debug.LogWarning("[Applier] LLMProcessor not found");
             return;
         }
 
@@ -145,15 +229,101 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
             return;
         }
 
-        string prompt = textStore.CurrentText;
-        Debug.Log($"[Applier] Applying '{prompt}' to {target.name}");
+        bool isTextObjectPlane = target.CompareTag("TextObjectPlane");
 
-        llmProcessor.ProcessPrompt(target, prompt);
-
-        if (TextObjectManager.Instance != null)
+        if (!isTextObjectPlane)
         {
-            TextObjectManager.Instance.RegisterTextObject(textRoot);
+            // 普通对象逻辑
+            if (llmProcessor == null)
+            {
+                Debug.LogWarning("[Applier] LLMProcessor not found");
+                return;
+            }
+
+            string prompt = textStore.CurrentText;
+            Debug.Log($"[Applier] Applying '{prompt}' to {target.name} (normal object)");
+            llmProcessor.ProcessPrompt(target, prompt);
             TextObjectManager.Instance.AddApplyTarget(textRoot, target);
+        }
+        else
+        {
+            if (llmProcessor == null)
+            {
+                Debug.LogWarning("[Applier] LLMProcessor not found");
+                return;
+            }
+
+            string finalAction = "turn off";
+            string finalText = "[LLM] " + finalAction;
+
+            Debug.Log($"[Applier] [TextObjectPlane] Using action: {finalAction}");
+
+            GameObject originalRoot = target.transform.parent != null ? target.transform.parent.gameObject : null;
+
+            if (originalRoot == null || !originalRoot.CompareTag("TextObject"))
+            {
+                Debug.LogWarning("[Applier] Cannot find TextObject root for target: " + target.name);
+                return;
+            }
+
+            List<GameObject> appliedObjects = TextObjectManager.Instance.GetApplyTargets(originalRoot);
+
+            if (appliedObjects == null || appliedObjects.Count == 0)
+            {
+                Debug.Log("[Applier] No previously registered apply objects for this TextObject root: " + originalRoot.name);
+            }
+
+
+            GameObject newTextObject = Instantiate(textRoot);
+
+            newTextObject.transform.position = new Vector3(-0.98f, -0.02f, -0.057f);
+            newTextObject.SetActive(false); // ❗ 不显示
+
+
+            CurrentTextStore newStore = newTextObject.GetComponent<CurrentTextStore>();
+            if (newStore != null)
+            {
+                newStore.CurrentText = finalText;
+            }
+            else
+            {
+                Debug.LogWarning("[Applier] New TextObject missing CurrentTextStore");
+            }
+
+
+            Transform inputFieldTransform = newTextObject.transform.Find("canvas/InputField (TMP)");
+            if (inputFieldTransform != null)
+            {
+                var tmpInput = inputFieldTransform.GetComponent<TMPro.TMP_InputField>();
+                if (tmpInput != null)
+                {
+                    tmpInput.text = finalText;
+                }
+                else
+                {
+                    Debug.LogWarning("[Applier] TMP_InputField component not found");
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[Applier] InputField (TMP) not found under canvas");
+            }
+
+
+            TextObjectManager.Instance.RegisterTextObject(newTextObject);
+
+
+            foreach (var appliedTarget in appliedObjects)
+            {
+                if (appliedTarget == null) continue;
+
+                Debug.Log($"[Applier] Applying action '{finalAction}' to applied target: {appliedTarget.name}");
+
+                llmProcessor.ProcessPrompt(appliedTarget, finalAction);
+
+
+                TextObjectManager.Instance.AddApplyTarget(newTextObject, appliedTarget);
+            }
         }
 
 
@@ -167,6 +337,15 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
             Debug.LogWarning("[Applier] Target missing TextNotificationHandler");
         }
 
+        ExitApplyModeCommon();
+
+        Debug.Log("[Applier] Apply Completed");
+    }
+
+
+
+    void ExitApplyModeCommon()
+    {
         applyMode = false;
         pinchActive = false;
 
@@ -175,13 +354,86 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
 
         currentTarget = null;
 
-        Debug.Log("[Applier] Apply Completed");
+        RestoreOtherTextObjectAppliers();
+        RestoreAllRaycasters();
     }
-    
+
     public void SetCurrentTarget(GameObject target) => currentTarget = target;
     public GameObject GetCurrentTarget() => currentTarget;
     public bool IsApplyMode() => applyMode;
 
+    // ---------- Applier 控制 ----------
+    void DisableOtherTextObjectAppliers()
+    {
+        disabledAppliers.Clear();
+
+        if (TextObjectManager.Instance == null) return;
+
+        var allTexts = TextObjectManager.Instance.GetAllTextObjects();
+
+        foreach (var obj in allTexts)
+        {
+            if (obj == null) continue;
+            if (obj == this.textRoot) continue;
+
+            var applier = obj.GetComponentInChildren<GazePinchPromptApplierOnDevice_Case2>();
+            if (applier != null && applier.enabled)
+            {
+                applier.enabled = false;
+                disabledAppliers.Add(applier);
+            }
+        }
+    }
+
+    void RestoreOtherTextObjectAppliers()
+    {
+        foreach (var applier in disabledAppliers)
+        {
+            if (applier != null)
+                applier.enabled = true;
+        }
+
+        disabledAppliers.Clear();
+    }
+
+    // ---------- Raycaster 控制（全局） ----------
+    void DisableAllRaycasters()
+    {
+        disabledRaycasters.Clear();
+
+        if (TextObjectManager.Instance == null) return;
+
+        var allTexts = TextObjectManager.Instance.GetAllTextObjects();
+
+        foreach (var obj in allTexts)
+        {
+            if (obj == null) continue;
+
+            var behaviours = obj.GetComponentsInChildren<Behaviour>();
+
+            foreach (var b in behaviours)
+            {
+                if (b != null && b.enabled && b.GetType().Name == "TrackedDeviceGraphicRaycaster")
+                {
+                    b.enabled = false;
+                    disabledRaycasters.Add(b);
+                }
+            }
+        }
+    }
+
+    void RestoreAllRaycasters()
+    {
+        foreach (var b in disabledRaycasters)
+        {
+            if (b != null)
+                b.enabled = true;
+        }
+
+        disabledRaycasters.Clear();
+    }
+
+    // ---------- 动画 ----------
     private IEnumerator BounceTextObject(GameObject obj, float scaleFactor, int times, float duration)
     {
         Vector3 originalScale = obj.transform.localScale;
