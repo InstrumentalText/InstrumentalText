@@ -2224,7 +2224,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7d49168b6dfb469dadf8cd56e4ab8884, type: 3}
   m_Name: PassthroughFeature Android
   m_EditorClassIdentifier: Unity.XR.OpenXR.Features.PICOSupport::Unity.XR.OpenXR.Features.PICOSupport.PassthroughFeature
-  m_enabled: 0
+  m_enabled: 1
   nameUi: OpenXR Passthrough
   version: 1.0.0
   featureIdInternal: com.pico.openxr.feature.passthrough

@@ -15,6 +15,13 @@ public class LibraryModeHandler : MonoBehaviour
     public InputActionProperty pinchAction;
     public float pinchDownThreshold = 0.8f;
 
+    [Header("Spawn Settings")]
+    public float spawnDistance = 0.5f;  
+    public float heightOffset = 0.0f;   
+
+    [Header("Gaze Reference (optional)")]
+    public UnityEngine.XR.Interaction.Toolkit.Interactors.XRRayInteractor gazeInteractor;
+
     [Header("Debug")]
     public bool debug = true;
 
@@ -47,7 +54,6 @@ public class LibraryModeHandler : MonoBehaviour
         if (targetButton != null)
             targetButton.OnModeStateChanged -= HandleModeChanged;
     }
-
 
     private void HandleModeChanged(bool active)
     {
@@ -94,15 +100,25 @@ public class LibraryModeHandler : MonoBehaviour
         Camera cam = Camera.main;
         if (cam == null) return;
 
-        libraryUI.transform.position =
-            cam.transform.position + cam.transform.forward * 0.5f;
+        float gazeY = cam.transform.position.y;
+        if (gazeInteractor != null &&
+            gazeInteractor.TryGetCurrent3DRaycastHit(out RaycastHit hit))
+        {
+            gazeY = hit.point.y;
+        }
 
-        libraryUI.transform.rotation =
-            Quaternion.LookRotation(cam.transform.forward);
+        Vector3 spawnPos = cam.transform.position + cam.transform.forward * spawnDistance;
+        spawnPos.y = gazeY + heightOffset;  // 高度 = gaze 高度 + 手动偏移
+
+        libraryUI.transform.position = spawnPos;
+        libraryUI.transform.rotation = Quaternion.LookRotation(cam.transform.forward);
 
         if (libraryUIController != null)
             libraryUIController.RefreshLibrary();
 
         libraryUI.SetActive(true);
+
+        if (debug)
+            Debug.Log($"[LibraryMode] Library UI 位置: {spawnPos}, 高度偏移: {heightOffset}");
     }
 }

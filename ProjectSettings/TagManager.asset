@@ -7,6 +7,8 @@ TagManager:
   - TextObject
   - GazeInteractor
   - ItemText
+  - Reverse
+  - TextObjectPlane
   layers:
   - Default
   - TransparentFX
