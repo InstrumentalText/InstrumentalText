@@ -7,22 +7,9 @@ using System.Text;
 
 public class LLMProcessorOnDevice : MonoBehaviour
 {
-    public enum LLMProvider
-    {
-        OpenAI,
-        DeepSeek
-    }
-
-    [Header("LLM Provider")]
-    public LLMProvider provider = LLMProvider.DeepSeek;
-
-    [Header("API Settings")]
-    [TextArea]
-    public string apiKey;
-
-    public string model = "deepseek-chat";
-
-    public string endpoint = "https://api.deepseek.com/v1/chat/completions";
+    private const string k_Model = "gpt-4o";
+    private const string k_Endpoint = "https://api.openai.com/v1/chat/completions";
+    private string apiKey;
 
     private const string k_PlannerPrompt =
 @"You are an action planner for a Unity game. The user will describe what they want to do, and you will be given a list of available actions with their parameters.
@@ -38,14 +25,15 @@ Rules:
 
     void Start()
     {
+        apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+
         if (string.IsNullOrEmpty(apiKey))
         {
-            Debug.LogError("[LLMProcessorOnDevice] API Key is empty!");
+            Debug.LogError("[LLMProcessorOnDevice] OPENAI_API_KEY environment variable is not set!");
         }
 
-        Debug.Log($"[LLMProcessorOnDevice] Provider: {provider}");
-        Debug.Log($"[LLMProcessorOnDevice] Model: {model}");
-        Debug.Log($"[LLMProcessorOnDevice] Endpoint: {endpoint}");
+        Debug.Log($"[LLMProcessorOnDevice] Model: {k_Model}");
+        Debug.Log($"[LLMProcessorOnDevice] Endpoint: {k_Endpoint}");
     }
 
     public void ProcessPrompt(GameObject obj, string userIntent)
@@ -67,7 +55,7 @@ Rules:
     {
         var requestBody = new JObject
         {
-            ["model"] = model,
+            ["k_Model"] = k_Model,
             ["messages"] = new JArray
             {
                 new JObject { ["role"] = "system", ["content"] = k_PlannerPrompt },
@@ -78,7 +66,7 @@ Rules:
 
         byte[] bodyRaw = Encoding.UTF8.GetBytes(requestBody.ToString());
 
-        using var request = new UnityWebRequest(endpoint, "POST");
+        using var request = new UnityWebRequest(k_Endpoint, "POST");
 
         request.uploadHandler = new UploadHandlerRaw(bodyRaw);
         request.downloadHandler = new DownloadHandlerBuffer();
