@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find b:/Tator/UnityProjects/InstrumentalText/Assets/Prefabs -type f -name *.prefab)"
+    ]
+  }
+}
