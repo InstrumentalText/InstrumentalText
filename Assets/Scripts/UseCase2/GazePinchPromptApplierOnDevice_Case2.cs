@@ -27,6 +27,14 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
 
     public Material lineMaterial;
 
+
+    [Header("Apply Visual (Per TextObject)")]
+
+    public Color appliedCavans = Color.red; 
+    public Color appliedUIColor = Color.green; // UI Image 颜色
+    public Color appliedTextColor = Color.black; // TMP 文本颜色
+
+
     private bool applyMode = false;
     private bool pinchActive = false;
     private float pinchTimer = 0f;
@@ -107,10 +115,8 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
 
         Debug.Log($"[Applier] Apply Mode Entered: {gameObject.name}");
 
-        // ✅ 禁用其他 Applier
         DisableOtherTextObjectAppliers();
 
-        // ✅ 禁用所有 TextObject 的 Raycaster（包括自己）
         DisableAllRaycasters();
 
         if (textRoot != null)
@@ -123,97 +129,6 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
         Debug.Log("[Applier] Exit Apply Mode");
     }
 
-    // public void ApplyPromptToTarget(GameObject target)
-    // {
-    //     if (target == null || textRoot == null)
-    //     {
-    //         Debug.LogWarning("[Applier] target or textRoot null");
-    //         return;
-    //     }
-
-    //     CurrentTextStore textStore = textRoot.GetComponent<CurrentTextStore>();
-    //     if (textStore == null || string.IsNullOrEmpty(textStore.CurrentText))
-    //     {
-    //         Debug.LogWarning("[Applier] CurrentText empty");
-    //         return;
-    //     }
-
-    //     bool isTextObjectPlane = target.CompareTag("TextObjectPlane");
-
-    //     if (!isTextObjectPlane)
-    //     {
-    //         if (llmProcessor == null)
-    //         {
-    //             Debug.LogWarning("[Applier] LLMProcessor not found");
-    //             return;
-    //         }
-
-    //         string prompt = textStore.CurrentText;
-    //         Debug.Log($"[Applier] Applying '{prompt}' to {target.name} (normal object)");
-    //         llmProcessor.ProcessPrompt(target, prompt);
-    //     }
-    //     else
-    //     {
-    //         if (llmProcessor == null)
-    //         {
-    //             Debug.LogWarning("[Applier] LLMProcessor not found");
-    //             return;
-    //         }
-
-    //         string finalAction = "turn off";
-    //         Debug.Log($"[Applier] [TextObjectPlane] Using action: {finalAction}");
-
-    //         GameObject textObjectRoot = target.transform.parent != null ? target.transform.parent.gameObject : null;
-
-    //         if (textObjectRoot == null || !textObjectRoot.CompareTag("TextObject"))
-    //         {
-    //             Debug.LogWarning("[Applier] Cannot find TextObject root for target: " + target.name);
-    //             return;
-    //         }
-
-
-    //         List<GameObject> appliedObjects = TextObjectManager.Instance.GetApplyTargets(textObjectRoot);
-
-    //         if (appliedObjects == null || appliedObjects.Count == 0)
-    //         {
-    //             Debug.Log("[Applier] No previously registered apply objects for this TextObject root: " + textObjectRoot.name);
-    //         }
-
-    //         foreach (var appliedTarget in appliedObjects)
-    //         {
-    //             if (appliedTarget == null) continue;
-
-    //             Debug.Log($"[Applier] Applying action '{finalAction}' to applied target: {appliedTarget.name}");
-    //             llmProcessor.ProcessPrompt(appliedTarget, finalAction);
-
-    //             // 注册已处理对象
-    //             TextObjectManager.Instance.AddApplyTarget(textObjectRoot, appliedTarget);
-    //         }
-
-    //         // 最后处理 target 本身并注册
-    //         if (!appliedObjects.Contains(target))
-    //         {
-    //             llmProcessor.ProcessPrompt(target, finalAction);
-    //             TextObjectManager.Instance.AddApplyTarget(textObjectRoot, target);
-    //         }
-    //     }
-
-    //     // 刷新通知
-    //     var handler = target.GetComponent<TextNotificationHandler>();
-    //     if (handler != null)
-    //     {
-    //         handler.RefreshNotifications();
-    //     }
-    //     else
-    //     {
-    //         Debug.LogWarning("[Applier] Target missing TextNotificationHandler");
-    //     }
-
-    //     // ✅ 退出 applyMode
-    //     ExitApplyModeCommon();
-
-    //     Debug.Log("[Applier] Apply Completed");
-    // }
     public void ApplyPromptToTarget(GameObject target)
     {
         if (target == null || textRoot == null)
@@ -233,7 +148,6 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
 
         if (!isTextObjectPlane)
         {
-            // 普通对象逻辑
             if (llmProcessor == null)
             {
                 Debug.LogWarning("[Applier] LLMProcessor not found");
@@ -244,6 +158,8 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
             Debug.Log($"[Applier] Applying '{prompt}' to {target.name} (normal object)");
             llmProcessor.ProcessPrompt(target, prompt);
             TextObjectManager.Instance.AddApplyTarget(textRoot, target);
+            //添加apply后的UI调整
+            ApplyVisualState(textRoot);
         }
         else
         {
@@ -277,7 +193,7 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
             GameObject newTextObject = Instantiate(textRoot);
 
             newTextObject.transform.position = new Vector3(-0.98f, -0.02f, -0.057f);
-            newTextObject.SetActive(false); // ❗ 不显示
+            newTextObject.SetActive(false); 
 
 
             CurrentTextStore newStore = newTextObject.GetComponent<CurrentTextStore>();
@@ -362,7 +278,6 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
     public GameObject GetCurrentTarget() => currentTarget;
     public bool IsApplyMode() => applyMode;
 
-    // ---------- Applier 控制 ----------
     void DisableOtherTextObjectAppliers()
     {
         disabledAppliers.Clear();
@@ -396,7 +311,6 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
         disabledAppliers.Clear();
     }
 
-    // ---------- Raycaster 控制（全局） ----------
     void DisableAllRaycasters()
     {
         disabledRaycasters.Clear();
@@ -433,7 +347,6 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
         disabledRaycasters.Clear();
     }
 
-    // ---------- 动画 ----------
     private IEnumerator BounceTextObject(GameObject obj, float scaleFactor, int times, float duration)
     {
         Vector3 originalScale = obj.transform.localScale;
@@ -459,4 +372,88 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
 
         obj.transform.localScale = originalScale;
     }
+
+    void ApplyCanvasColor(GameObject textObj)
+    {
+        // 找到 Plane
+        Transform plane = textObj.transform.Find("Plane");
+        if (plane == null)
+        {
+            Debug.LogWarning("[Applier] Plane not found under textObj");
+            return;
+        }
+
+        Transform canvas = plane.Find("Canvas");
+        if (canvas == null)
+        {
+            Debug.LogWarning("[Applier] Canvas not found under Plane");
+            return;
+        }
+
+        UnityEngine.UI.Image[] images = canvas.GetComponentsInChildren<UnityEngine.UI.Image>(true);
+        foreach (var img in images)
+        {
+            img.color = appliedCavans;
+        }
+
+        Debug.Log("[Applier] Canvas Image color applied!");
+    }
+
+    void ApplyUIColor(GameObject textObj)
+    {
+        Transform plane = textObj.transform.Find("Plane");
+        if (plane == null) return;
+
+        Transform canvas = plane.Find("Input Field World Keyboard");
+        if (canvas == null)
+        {
+            Debug.LogWarning("[Applier] Canvas not found");
+            return;
+        }
+
+        var images = canvas.GetComponentsInChildren<UnityEngine.UI.Image>(true);
+        foreach (var img in images)
+        {
+            img.color = appliedUIColor;
+        }
+    }
+
+
+    void ApplyTMPColor(GameObject textObj)
+    {
+        Transform plane = textObj.transform.Find("Plane");
+        if (plane == null) return;
+
+        Transform inputField = plane.Find("Input Field World Keyboard/InputField (TMP)");
+        if (inputField == null)
+        {
+            Debug.LogWarning("[Applier] TMP InputField not found");
+            return;
+        }
+
+        var input = inputField.GetComponent<TMPro.TMP_InputField>();
+        if (input != null)
+        {
+            if (input.textComponent != null)
+                input.textComponent.color = appliedTextColor;
+
+            if (input.placeholder is TMPro.TMP_Text placeholder)
+                placeholder.color = appliedTextColor * 0.5f;
+        }
+
+        var texts = inputField.GetComponentsInChildren<TMPro.TMP_Text>(true);
+        foreach (var t in texts)
+        {
+            t.color = appliedTextColor;
+        }
+    }
+
+    void ApplyVisualState(GameObject textObj)
+    {
+        ApplyCanvasColor(textObj);
+        ApplyUIColor(textObj);
+        ApplyTMPColor(textObj);
+    }
+
+
 }

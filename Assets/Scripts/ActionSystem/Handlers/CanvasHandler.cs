@@ -118,7 +118,6 @@ public class CanvasHandler : MonoBehaviour, IActionHandler
         if (compareResultObject == null)
             return new ActionResult { success = false, errorCode = "NO_PREFAB", message = "Compare result object is not assigned." };
 
-        // ✅ 直接激活 prefab，内容由 prefab 内部管理
         compareResultObject.SetActive(true);
         compareResultObject.transform.position = transform.position + compareSpawnOffset;
         compareResultObject.transform.rotation = transform.rotation;

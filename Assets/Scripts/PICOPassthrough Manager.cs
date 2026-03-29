@@ -22,3 +22,27 @@ public class PICOPassthroughManager : MonoBehaviour
         }
     } 
 }
+
+
+// using System.Collections;
+// using System.Collections.Generic;
+// using UnityEngine;
+// using Unity.XR.PXR;
+
+// public class PICOPassthroughManager : MonoBehaviour
+// {
+//     void Start()
+//     {
+//         PXR_Manager.EnableVideoSeeThrough = true;
+
+//     }
+//     private void OnApplicationPause(bool pause)
+//     {
+//         PXR_Manager.EnableVideoSeeThrough = !pause;
+
+//     }
+//     void Update()
+//     {
+
+//     }
+// }
