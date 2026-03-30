@@ -15,7 +15,7 @@ EditorBuildSettings:
     path: Assets/Scenes/GazeTest.unity
     guid: a0e4b5e69620d094c967789400ca9457
   - enabled: 0
-    path: Assets/Scenes/UseCase2 _EHI.unity
+    path: Assets/Scenes/Case2EHI.unity
     guid: b6b1260d5e9c5684bb797956a51c7c8f
   - enabled: 0
     path: Assets/Scenes/Handmenu.unity

@@ -229,102 +229,16 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
             return;
         }
 
-        bool isTextObjectPlane = target.CompareTag("TextObjectPlane");
-
-        if (!isTextObjectPlane)
+        if (llmProcessor == null)
         {
-            // 普通对象逻辑
-            if (llmProcessor == null)
-            {
-                Debug.LogWarning("[Applier] LLMProcessor not found");
-                return;
-            }
-
-            string prompt = textStore.CurrentText;
-            Debug.Log($"[Applier] Applying '{prompt}' to {target.name} (normal object)");
-            llmProcessor.ProcessPrompt(target, prompt);
-            TextObjectManager.Instance.AddApplyTarget(textRoot, target);
+            Debug.LogWarning("[Applier] LLMProcessor not found");
+            return;
         }
-        else
-        {
-            if (llmProcessor == null)
-            {
-                Debug.LogWarning("[Applier] LLMProcessor not found");
-                return;
-            }
 
-            string finalAction = "turn off";
-            string finalText = "[LLM] " + finalAction;
-
-            Debug.Log($"[Applier] [TextObjectPlane] Using action: {finalAction}");
-
-            GameObject originalRoot = target.transform.parent != null ? target.transform.parent.gameObject : null;
-
-            if (originalRoot == null || !originalRoot.CompareTag("TextObject"))
-            {
-                Debug.LogWarning("[Applier] Cannot find TextObject root for target: " + target.name);
-                return;
-            }
-
-            List<GameObject> appliedObjects = TextObjectManager.Instance.GetApplyTargets(originalRoot);
-
-            if (appliedObjects == null || appliedObjects.Count == 0)
-            {
-                Debug.Log("[Applier] No previously registered apply objects for this TextObject root: " + originalRoot.name);
-            }
-
-
-            GameObject newTextObject = Instantiate(textRoot);
-
-            newTextObject.transform.position = new Vector3(-0.98f, -0.02f, -0.057f);
-            newTextObject.SetActive(false); // ❗ 不显示
-
-
-            CurrentTextStore newStore = newTextObject.GetComponent<CurrentTextStore>();
-            if (newStore != null)
-            {
-                newStore.CurrentText = finalText;
-            }
-            else
-            {
-                Debug.LogWarning("[Applier] New TextObject missing CurrentTextStore");
-            }
-
-
-            Transform inputFieldTransform = newTextObject.transform.Find("canvas/InputField (TMP)");
-            if (inputFieldTransform != null)
-            {
-                var tmpInput = inputFieldTransform.GetComponent<TMPro.TMP_InputField>();
-                if (tmpInput != null)
-                {
-                    tmpInput.text = finalText;
-                }
-                else
-                {
-                    Debug.LogWarning("[Applier] TMP_InputField component not found");
-                }
-            }
-            else
-            {
-                Debug.LogWarning("[Applier] InputField (TMP) not found under canvas");
-            }
-
-
-            TextObjectManager.Instance.RegisterTextObject(newTextObject);
-
-
-            foreach (var appliedTarget in appliedObjects)
-            {
-                if (appliedTarget == null) continue;
-
-                Debug.Log($"[Applier] Applying action '{finalAction}' to applied target: {appliedTarget.name}");
-
-                llmProcessor.ProcessPrompt(appliedTarget, finalAction);
-
-
-                TextObjectManager.Instance.AddApplyTarget(newTextObject, appliedTarget);
-            }
-        }
+        string prompt = textStore.CurrentText;
+        Debug.Log($"[Applier] Applying '{prompt}' to {target.name}");
+        llmProcessor.ProcessPrompt(target, prompt);
+        TextObjectManager.Instance.AddApplyTarget(textRoot, target);
 
 
         var handler = target.GetComponent<TextNotificationHandler>();

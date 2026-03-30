@@ -38,10 +38,23 @@ public class PinchHoldSpawnText_XRI : MonoBehaviour
 
     void Update()
     {
-        if (builderModeHandler == null || !builderModeHandler.IsBuilderActive())
+        if (builderModeHandler == null)
+        {
+            if (debug) Debug.Log("[Spawn] builderModeHandler 为 null，跳过");
             return;
+        }
+
+        if (!builderModeHandler.IsBuilderActive())
+        {
+            if (debug && Time.frameCount % 300 == 0)
+                Debug.Log("[Spawn] BuilderMode 未激活，跳过");
+            return;
+        }
 
         float pinchValue = pinchAction.action.ReadValue<float>();
+
+        if (debug && Time.frameCount % 60 == 0)
+            Debug.Log($"[Spawn] pinchValue={pinchValue:F2}, pinchPressed={pinchPressed}, hasSpawned={hasSpawnedThisPinch}, timer={pinchTimer:F2}");
 
         // -------------------------------
         // Pinch Start
