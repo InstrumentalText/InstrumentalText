@@ -80,6 +80,15 @@ public class LightHandler : MonoBehaviour, IActionHandler
         }
     };
 
+    private void Start()
+    {
+        if (lightComponent != null)
+        {
+            lightComponent.enabled = false;
+            UpdateBulbEmission();
+        }
+    }
+
     public IReadOnlyList<ActionSpec> GetActionSpecs()
     {
         return actionSpecs;

@@ -1,16 +1,14 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Samples.SpatialKeyboard;
 
 public class PinchHoldSpawnText_XRI : MonoBehaviour
 {
     [Header("Pinch Input")]
     public InputActionProperty pinchAction;
 
-    [Header("Pinch Threshold & Hold")]
+    [Header("Pinch Threshold")]
     public float pinchDownThreshold = 0.8f;
-    public float pinchUpThreshold = 0.2f;
-    public float pinchHoldTime = 1.0f;
 
     [Header("Spawn Settings")]
     public GameObject textPrefab;
@@ -25,120 +23,89 @@ public class PinchHoldSpawnText_XRI : MonoBehaviour
     [Header("Debug")]
     public bool debug = true;
 
-    private float pinchTimer = 0f;
-    private bool pinchPressed = false;
-
-    private bool hasSpawnedThisPinch = false;
-    private GameObject currentTextObject = null;
-
+    private bool keyboardOpen = false;
     private int textCounter = 0;
-
-    private Collider[] currentColliders = null;
-    private Behaviour[] currentRaycasters = null;
 
     void Update()
     {
-        if (builderModeHandler == null)
+        if (builderModeHandler == null || !builderModeHandler.IsBuilderActive())
         {
-            if (debug) Debug.Log("[Spawn] builderModeHandler 为 null，跳过");
+            if (keyboardOpen)
+                CloseKeyboard();
             return;
         }
 
-        if (!builderModeHandler.IsBuilderActive())
+        if (!keyboardOpen)
         {
-            if (debug && Time.frameCount % 300 == 0)
-                Debug.Log("[Spawn] BuilderMode 未激活，跳过");
-            return;
-        }
+            float pinchValue = pinchAction.action.ReadValue<float>();
 
-        float pinchValue = pinchAction.action.ReadValue<float>();
-
-        if (debug && Time.frameCount % 60 == 0)
-            Debug.Log($"[Spawn] pinchValue={pinchValue:F2}, pinchPressed={pinchPressed}, hasSpawned={hasSpawnedThisPinch}, timer={pinchTimer:F2}");
-
-        // -------------------------------
-        // Pinch Start
-        // -------------------------------
-        if (!pinchPressed && pinchValue > pinchDownThreshold)
-        {
-            pinchPressed = true;
-            pinchTimer = 0f;
-            hasSpawnedThisPinch = false;
-            currentTextObject = null;
-            currentColliders = null;
-            currentRaycasters = null;
-
-            if (debug) Debug.Log("[Spawn] Pinch Start");
-        }
-
-        // -------------------------------
-        // Pinch Release
-        // -------------------------------
-        if (pinchPressed && pinchValue < pinchUpThreshold)
-        {
-            pinchPressed = false;
-            pinchTimer = 0f;
-
-            if (currentTextObject != null)
+            if (pinchValue >= pinchDownThreshold)
             {
-                var applier = currentTextObject.GetComponent<GazePinchPromptApplierOnDevice_Case2>();
-                if (applier != null) applier.enabled = true;
+                OpenKeyboard();
 
-                if (currentColliders != null)
-                {
-                    foreach (var col in currentColliders)
-                        if (col != null) col.enabled = true;
-                }
-
-                if (currentRaycasters != null)
-                {
-                    foreach (var ray in currentRaycasters)
-                        if (ray != null && ray.GetType().Name == "TrackedDeviceGraphicRaycaster")
-                            ray.enabled = true;
-                }
-
-                if (debug) Debug.Log($"[Spawn] Pinch Release → 固定 {currentTextObject.name}，恢复脚本、Collider、Raycaster");
+                if (debug)
+                    Debug.Log("[Spawn] Pinch → 打开键盘");
             }
+        }
+    }
 
-            currentTextObject = null;
-            hasSpawnedThisPinch = false;
-            currentColliders = null;
-            currentRaycasters = null;
-
+    void OpenKeyboard()
+    {
+        var globalKeyboard = GlobalNonNativeKeyboard.instance;
+        if (globalKeyboard == null || globalKeyboard.keyboard == null)
+        {
+            Debug.LogWarning("[Spawn] GlobalNonNativeKeyboard 未找到");
             return;
         }
 
+        var keyboard = globalKeyboard.keyboard;
 
-        if (pinchPressed)
+        keyboard.onTextSubmitted.AddListener(OnKeyboardSubmitted);
+        globalKeyboard.ShowKeyboard(true);
+
+        keyboardOpen = true;
+    }
+
+    void CloseKeyboard()
+    {
+        var globalKeyboard = GlobalNonNativeKeyboard.instance;
+        if (globalKeyboard != null && globalKeyboard.keyboard != null)
         {
-            pinchTimer += Time.deltaTime;
-
-            if (!hasSpawnedThisPinch && pinchTimer >= pinchHoldTime)
-            {
-                currentTextObject = SpawnText();
-                hasSpawnedThisPinch = true;
-
-                if (currentTextObject != null)
-                {
-                    var applier = currentTextObject.GetComponent<GazePinchPromptApplierOnDevice_Case2>();
-                    if (applier != null) applier.enabled = false;
-
-                    currentColliders = currentTextObject.GetComponentsInChildren<Collider>();
-                    foreach (var col in currentColliders)
-                        if (col != null) col.enabled = false;
-
-                    currentRaycasters = currentTextObject.GetComponentsInChildren<Behaviour>();
-                    foreach (var b in currentRaycasters)
-                        if (b != null && b.GetType().Name == "TrackedDeviceGraphicRaycaster")
-                            b.enabled = false;
-                }
-
-                if (debug) Debug.Log("[Spawn] 已生成 TextObject（跟随阶段），禁用脚本、Collider、Raycaster");
-            }
-
-            if (currentTextObject != null)
-                FollowHand(currentTextObject);
+            globalKeyboard.keyboard.onTextSubmitted.RemoveListener(OnKeyboardSubmitted);
+            globalKeyboard.HideKeyboard();
         }
+
+        keyboardOpen = false;
+    }
+
+    void OnKeyboardSubmitted(KeyboardTextEventArgs args)
+    {
+        string text = args.keyboardText?.Trim();
+
+        if (string.IsNullOrEmpty(text))
+        {
+            if (debug) Debug.Log("[Spawn] 输入为空，忽略");
+            return;
+        }
+
+        GameObject newTextObject = SpawnText();
+        if (newTextObject == null) return;
+
+        var store = newTextObject.GetComponent<CurrentTextStore>();
+        if (store != null)
+            store.CurrentText = text;
+
+        var inputField = newTextObject.GetComponentInChildren<TMPro.TMP_InputField>(true);
+        if (inputField != null)
+            inputField.text = text;
+
+        if (TextObjectManager.Instance != null)
+            TextObjectManager.Instance.RegisterTextObject(newTextObject);
+
+        if (debug)
+            Debug.Log($"[Spawn] Enter → 创建 TextObject '{newTextObject.name}'，内容='{text}'");
+
+        CloseKeyboard();
     }
 
     GameObject SpawnText()
@@ -172,17 +139,5 @@ public class PinchHoldSpawnText_XRI : MonoBehaviour
         if (debug) Debug.Log($"[Spawn] 创建 {newText.name}，位置 {spawnPos}");
 
         return newText;
-    }
-
-
-    void FollowHand(GameObject obj)
-    {
-        Camera cam = Camera.main;
-        if (cam == null || obj == null) return;
-
-        Vector3 targetPos = cam.transform.position + cam.transform.forward * spawnDistance;
-
-        obj.transform.position = targetPos;
-        obj.transform.rotation = Quaternion.LookRotation(cam.transform.forward);
     }
 }

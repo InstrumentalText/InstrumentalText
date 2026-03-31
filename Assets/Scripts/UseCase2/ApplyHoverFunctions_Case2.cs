@@ -19,9 +19,6 @@ public class ApplyHoverFunctions_Case2 : MonoBehaviour
         outline.OutlineWidth = outlineWidth;
     }
 
-    [Header("TextObjectPlane Support")]
-    public bool allowTextObjectPlaneTarget = false;
-
     public void OnFirstHoverEntered(HoverEnterEventArgs args)
     {
         var applier = GazePinchPromptApplierOnDevice_Case2.ActiveInstance;
@@ -35,12 +32,6 @@ public class ApplyHoverFunctions_Case2 : MonoBehaviour
         if (!applier.IsApplyMode())
         {
             Debug.Log("[ApplyHoverFunctions] Not in ApplyMode → ignore hover");
-            return;
-        }
-
-        if (!allowTextObjectPlaneTarget && gameObject.CompareTag("TextObjectPlane"))
-        {
-            Debug.Log($"[ApplyHoverFunctions] TextObjectPlane support disabled → ignore {gameObject.name}");
             return;
         }
 
@@ -63,10 +54,10 @@ public class ApplyHoverFunctions_Case2 : MonoBehaviour
         if (applier.GetCurrentTarget() == gameObject)
         {
             applier.SetCurrentTarget(null);
-            // Debug.Log($"[ApplyHoverFunctions] Cleared current target: {gameObject.name}");
+            Debug.Log($"[ApplyHoverFunctions] Cleared current target: {gameObject.name}");
         }
 
-        // Debug.Log($"[ApplyHoverFunctions] Hover Exit: {gameObject.name}");
+        Debug.Log($"[ApplyHoverFunctions] Hover Exit: {gameObject.name}");
     }
 
     void SetOutline(bool state)
@@ -74,7 +65,7 @@ public class ApplyHoverFunctions_Case2 : MonoBehaviour
         if (outline != null)
         {
             outline.enabled = state;
-            // Debug.Log($"[ApplyHoverFunctions] Outline {(state ? "ON" : "OFF")} for {gameObject.name}");
+            Debug.Log($"[ApplyHoverFunctions] Outline {(state ? "ON" : "OFF")} for {gameObject.name}");
         }
     }
 }

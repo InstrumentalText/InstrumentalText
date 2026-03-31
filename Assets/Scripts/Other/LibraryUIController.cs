@@ -47,6 +47,15 @@ public class LibraryUIController : MonoBehaviour
             uniqueTexts.Add(store.CurrentText.Trim());
         }
 
+        if (InteractionLibraryManager.Instance != null)
+        {
+            foreach (var record in InteractionLibraryManager.Instance.GetAllRecords())
+            {
+                if (!string.IsNullOrEmpty(record.prompt))
+                    uniqueTexts.Add(record.prompt.Trim());
+            }
+        }
+
         List<string> textList = new List<string>(uniqueTexts);
 
         if (textList.Count == 0) return;

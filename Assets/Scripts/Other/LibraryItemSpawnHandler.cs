@@ -17,6 +17,7 @@ public class LibraryItemSpawnHandler : MonoBehaviour
     public float pinchHoldTime = 1.0f;
 
     [Header("Spawn Settings")]
+    public GameObject textPrefab;
     public float spawnDistance = 0.6f;
 
     [Header("Text Offset Relative to Library UI")]
@@ -107,7 +108,7 @@ public class LibraryItemSpawnHandler : MonoBehaviour
             if (!hasSpawned && pinchTimer >= pinchHoldTime)
             {
                 string itemText = GetItemText();
-                currentTextObject = SpawnFromExistingTextObject(itemText);
+                currentTextObject = SpawnFromPrefab(itemText);
 
                 if (currentTextObject != null)
                 {
@@ -185,29 +186,14 @@ public class LibraryItemSpawnHandler : MonoBehaviour
         return txt != null ? txt.text.Trim() : "";
     }
 
-    GameObject SpawnFromExistingTextObject(string itemText)
+    GameObject SpawnFromPrefab(string itemText)
     {
-        if (string.IsNullOrEmpty(itemText) || TextObjectManager.Instance == null)
+        if (string.IsNullOrEmpty(itemText))
             return null;
 
-        var all = TextObjectManager.Instance.GetAllTextObjects();
-        GameObject source = null;
-
-        foreach (var obj in all)
+        if (textPrefab == null)
         {
-            if (obj == null) continue;
-            var store = obj.GetComponent<CurrentTextStore>();
-            if (store == null) continue;
-            if (!string.IsNullOrEmpty(store.CurrentText) && store.CurrentText.Trim() == itemText)
-            {
-                source = obj;
-                break;
-            }
-        }
-
-        if (source == null)
-        {
-            Debug.LogWarning($"[LibrarySpawn] 找不到匹配: {itemText}");
+            Debug.LogWarning("[LibrarySpawn] textPrefab 未设置");
             return null;
         }
 
@@ -227,8 +213,16 @@ public class LibraryItemSpawnHandler : MonoBehaviour
 
         Quaternion rot = Quaternion.LookRotation(cam.transform.forward);
 
-        GameObject newObj = Instantiate(source, spawnPos, rot);
+        GameObject newObj = Instantiate(textPrefab, spawnPos, rot);
         newObj.SetActive(true);
+
+        var store = newObj.GetComponent<CurrentTextStore>();
+        if (store != null)
+            store.CurrentText = itemText;
+
+        var inputField = newObj.GetComponentInChildren<TMPro.TMP_InputField>(true);
+        if (inputField != null)
+            inputField.text = itemText;
 
         return newObj;
     }
