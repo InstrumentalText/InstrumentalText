@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.XR.ARFoundation;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -50,9 +51,12 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
 
     private List<Behaviour> disabledRaycasters = new List<Behaviour>();
 
+    private ARAnchorManager anchorManager;
+
     void Start()
     {
         llmProcessor = FindObjectOfType<LLMProcessorOnDevice_Case2>();
+        anchorManager = FindAnyObjectByType<ARAnchorManager>();
         mainCamera = Camera.main;
 
         if (textRoot == null)
@@ -207,7 +211,7 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
             }
 
 
-            Transform inputFieldTransform = newTextObject.transform.Find("canvas/InputField (TMP)");
+            Transform inputFieldTransform = newTextObject.transform.Find("Plane/Input Field World Keyboard/InputField (TMP)");
             if (inputFieldTransform != null)
             {
                 var tmpInput = inputFieldTransform.GetComponent<TMPro.TMP_InputField>();
@@ -233,26 +237,21 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
             {
                 if (appliedTarget == null) continue;
 
-                Debug.Log($"[Applier] Applying action '{finalAction}' to applied target: {appliedTarget.name}");
+                Debug.Log($"[Applier] Executing hardcoded turn off on: {appliedTarget.name}");
 
-                llmProcessor.ProcessPrompt(appliedTarget, finalAction);
-
+                ExecuteHardcodedTurnOff(appliedTarget);
 
                 TextObjectManager.Instance.AddApplyTarget(newTextObject, appliedTarget);
+
+                var handler = appliedTarget.GetComponent<TextNotificationHandler>();
+                if (handler != null)
+                {
+                    handler.RefreshNotifications();
+                }
             }
         }
 
-
-        var handler = target.GetComponent<TextNotificationHandler>();
-        if (handler != null)
-        {
-            handler.RefreshNotifications();
-        }
-        else
-        {
-            Debug.LogWarning("[Applier] Target missing TextNotificationHandler");
-        }
-
+        AttachToSpatialAnchor(textRoot);
         ExitApplyModeCommon();
 
         Debug.Log("[Applier] Apply Completed");
@@ -455,5 +454,49 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
         ApplyTMPColor(textObj);
     }
 
+    private void ExecuteHardcodedTurnOff(GameObject target)
+    {
+        var handlers = target.GetComponents<IActionHandler>();
+        var context = new ExecutionContext(target);
 
+        foreach (var handler in handlers)
+        {
+            string actionType = null;
+
+            if (handler is LightHandler)
+                actionType = "light.off";
+            else if (handler is MusicPlayerHandler)
+                actionType = "switch.off";
+
+            if (actionType == null) continue;
+
+            var result = handler.Execute(actionType, "{}", context);
+            Debug.Log($"[Applier] [T2T] {actionType} on '{target.name}' → success={result.success}");
+        }
+    }
+
+    async void AttachToSpatialAnchor(GameObject obj)
+    {
+        if (anchorManager == null)
+        {
+            Debug.LogWarning($"[Applier] ARAnchorManager not found, cannot anchor {obj.name}");
+            return;
+        }
+
+        var pose = new Pose(obj.transform.position, obj.transform.rotation);
+        var result = await anchorManager.TryAddAnchorAsync(pose);
+
+        if (result.status.IsSuccess())
+        {
+            var anchor = result.value;
+            obj.transform.SetParent(anchor.transform, true);
+            obj.transform.localPosition = Vector3.zero;
+            obj.transform.localRotation = Quaternion.identity;
+            Debug.Log($"[Applier] {obj.name} anchored at {anchor.transform.position}");
+        }
+        else
+        {
+            Debug.LogWarning($"[Applier] Failed to create anchor for {obj.name}: {result.status}");
+        }
+    }
 }

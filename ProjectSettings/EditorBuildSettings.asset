@@ -20,9 +20,12 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/Handmenu.unity
     guid: cad2aaf3bfdd7b6489faa90b837688c6
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/Scenario 4.unity
     guid: dad219902325d454f82841e34009899e
+  - enabled: 1
+    path: Assets/Scenes/Scenario 1.unity
+    guid: 5b15f6bbe5f44274697b5611e24dbe9c
   m_configObjects:
     Unity.XR.Oculus.Settings: {fileID: 11400000, guid: e28a76da9c8e94a42a949579b79eefda, type: 2}
     Unity.XR.PICO.LivePreview.Settings: {fileID: 11400000, guid: 80806e7808d785e48b16dcb3ca3354b3, type: 2}

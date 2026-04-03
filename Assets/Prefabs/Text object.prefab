@@ -489,7 +489,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1012226965439848193}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8a35f6cfbfba9b548aaa00d52cfe8a50, type: 3}
   m_Name: 
@@ -595,7 +595,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ApplyHoverFunctions_Case2
   outlineColor: {r: 0.015686274, g: 0.86910236, b: 1, a: 1}
   outlineWidth: 20
-  allowTextObjectPlaneTarget: 1
 --- !u!65 &1664094972958187158
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -800,7 +799,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4706888489882814384}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a828f12b27d59974280757703d82f3f8, type: 3}
   m_Name: 
