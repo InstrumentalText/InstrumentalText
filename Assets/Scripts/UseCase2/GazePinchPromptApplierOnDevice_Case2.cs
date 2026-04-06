@@ -23,41 +23,36 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
     public int bounceTimes = 3;
     public float bounceDuration = 0.2f;
 
-    [Header("Dot Connection")]
-    public string dotName = "Dot";
-
+    [Header("Spawn")]
+    public GameObject colorMirrorPrefab;
     public Material lineMaterial;
+    public float lineWidth = 0.005f;
 
+    private TextColorController textColorController;
 
-    [Header("Apply Visual (Per TextObject)")]
-
-    public Color appliedCavans = Color.red; 
-    public Color appliedUIColor = Color.green; // UI Image 颜色
-    public Color appliedTextColor = Color.black; // TMP 文本颜色
-
+    private int ballSpawnCount = 0;
 
     private bool applyMode = false;
     private bool pinchActive = false;
     private float pinchTimer = 0f;
 
-    private LLMProcessorOnDevice_Case2 llmProcessor;
     private Camera mainCamera;
+    private ARAnchorManager anchorManager;
+    private GameObject heldBall;
 
     private GameObject currentTarget = null;
 
-    private List<GameObject> spawnedLines = new List<GameObject>();
-
     private List<GazePinchPromptApplierOnDevice_Case2> disabledAppliers = new List<GazePinchPromptApplierOnDevice_Case2>();
-
     private List<Behaviour> disabledRaycasters = new List<Behaviour>();
-
-    private ARAnchorManager anchorManager;
 
     void Start()
     {
-        llmProcessor = FindObjectOfType<LLMProcessorOnDevice_Case2>();
-        anchorManager = FindAnyObjectByType<ARAnchorManager>();
         mainCamera = Camera.main;
+        anchorManager = FindAnyObjectByType<ARAnchorManager>();
+
+        textColorController = FindAnyObjectByType<TextColorController>();
+        if (textColorController == null)
+            Debug.LogWarning("[Applier] TextColorController not found in scene");
 
         if (textRoot == null)
             textRoot = transform.root.gameObject;
@@ -91,16 +86,8 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
 
         if (pinchActive && pinchValue < pinchUpThreshold)
         {
-            if (currentTarget != null)
-            {
-                Debug.Log($"[Applier] Pinch released → apply to {currentTarget.name}");
-                ApplyPromptToTarget(currentTarget);
-            }
-            else
-            {
-                Debug.Log("[Applier] No target");
-                ExitApplyModeWithoutApply();
-            }
+            ReleaseHeldBall();
+            ExitApplyModeCommon();
         }
     }
 
@@ -120,144 +107,62 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
         Debug.Log($"[Applier] Apply Mode Entered: {gameObject.name}");
 
         DisableOtherTextObjectAppliers();
-
         DisableAllRaycasters();
 
         if (textRoot != null)
             StartCoroutine(BounceTextObject(textRoot, scaleFactor, bounceTimes, bounceDuration));
     }
 
-    void ExitApplyModeWithoutApply()
+    void ReleaseHeldBall()
     {
-        ExitApplyModeCommon();
-        Debug.Log("[Applier] Exit Apply Mode");
+        if (colorMirrorPrefab == null)
+        {
+            Debug.LogWarning("[Applier] colorMirrorPrefab not assigned");
+            return;
+        }
+
+        GameObject eyeCursor = GameObject.Find("EyeCursor(Clone)");
+        Vector3 spawnPos = eyeCursor != null ? eyeCursor.transform.position : mainCamera.transform.position + mainCamera.transform.forward * 0.5f;
+        Quaternion spawnRot = eyeCursor != null ? eyeCursor.transform.rotation : Quaternion.identity;
+
+        if (eyeCursor == null)
+            Debug.LogWarning("[Applier] EyeCursor(Clone) not found, using fallback position");
+
+        heldBall = Instantiate(colorMirrorPrefab, spawnPos, spawnRot);
+        Debug.Log($"[Applier] Spawned ColorMirror at EyeCursor position {spawnPos}");
+
+        ConnectLineToTextRoot(heldBall);
+        AttachToSpatialAnchor(heldBall);
+        heldBall = null;
+
+        ballSpawnCount++;
+        if (ballSpawnCount == 2 && textColorController != null)
+            textColorController.ActivateText1();
+        else if (ballSpawnCount == 4 && textColorController != null)
+            textColorController.ActivateText2();
     }
 
-    public void ApplyPromptToTarget(GameObject target)
+    void ConnectLineToTextRoot(GameObject ball)
     {
-        if (target == null || textRoot == null)
-        {
-            Debug.LogWarning("[Applier] target or textRoot null");
-            return;
-        }
+        if (textRoot == null) return;
 
-        CurrentTextStore textStore = textRoot.GetComponent<CurrentTextStore>();
-        if (textStore == null || string.IsNullOrEmpty(textStore.CurrentText))
-        {
-            Debug.LogWarning("[Applier] CurrentText empty");
-            return;
-        }
+        var lr = ball.AddComponent<LineRenderer>();
+        lr.positionCount = 2;
+        lr.startWidth = lineWidth;
+        lr.endWidth = lineWidth;
+        lr.useWorldSpace = true;
 
-        bool isTextObjectPlane = target.CompareTag("TextObjectPlane");
-
-        if (!isTextObjectPlane)
-        {
-            if (llmProcessor == null)
-            {
-                Debug.LogWarning("[Applier] LLMProcessor not found");
-                return;
-            }
-
-            string prompt = textStore.CurrentText;
-            Debug.Log($"[Applier] Applying '{prompt}' to {target.name} (normal object)");
-            llmProcessor.ProcessPrompt(target, prompt);
-            TextObjectManager.Instance.AddApplyTarget(textRoot, target);
-            //添加apply后的UI调整
-            ApplyVisualState(textRoot);
-        }
+        if (lineMaterial != null)
+            lr.material = lineMaterial;
         else
-        {
-            if (llmProcessor == null)
-            {
-                Debug.LogWarning("[Applier] LLMProcessor not found");
-                return;
-            }
+            lr.material = new Material(Shader.Find("Sprites/Default"));
 
-            string finalAction = "turn off";
-            string finalText = "[LLM] " + finalAction;
+        Transform plane = textRoot.transform.Find("Plane");
+        Transform lineTarget = plane != null ? plane : textRoot.transform;
 
-            Debug.Log($"[Applier] [TextObjectPlane] Using action: {finalAction}");
-
-            GameObject originalRoot = target.transform.parent != null ? target.transform.parent.gameObject : null;
-
-            if (originalRoot == null || !originalRoot.CompareTag("TextObject"))
-            {
-                Debug.LogWarning("[Applier] Cannot find TextObject root for target: " + target.name);
-                return;
-            }
-
-            List<GameObject> appliedObjects = TextObjectManager.Instance.GetApplyTargets(originalRoot);
-
-            if (appliedObjects == null || appliedObjects.Count == 0)
-            {
-                Debug.Log("[Applier] No previously registered apply objects for this TextObject root: " + originalRoot.name);
-            }
-
-
-            GameObject newTextObject = Instantiate(textRoot);
-
-            newTextObject.transform.position = new Vector3(-0.98f, -0.02f, -0.057f);
-            newTextObject.SetActive(false); 
-
-
-            CurrentTextStore newStore = newTextObject.GetComponent<CurrentTextStore>();
-            if (newStore != null)
-            {
-                newStore.CurrentText = finalText;
-            }
-            else
-            {
-                Debug.LogWarning("[Applier] New TextObject missing CurrentTextStore");
-            }
-
-
-            Transform inputFieldTransform = newTextObject.transform.Find("Plane/Input Field World Keyboard/InputField (TMP)");
-            if (inputFieldTransform != null)
-            {
-                var tmpInput = inputFieldTransform.GetComponent<TMPro.TMP_InputField>();
-                if (tmpInput != null)
-                {
-                    tmpInput.text = finalText;
-                }
-                else
-                {
-                    Debug.LogWarning("[Applier] TMP_InputField component not found");
-                }
-            }
-            else
-            {
-                Debug.LogWarning("[Applier] InputField (TMP) not found under canvas");
-            }
-
-
-            TextObjectManager.Instance.RegisterTextObject(newTextObject);
-
-
-            foreach (var appliedTarget in appliedObjects)
-            {
-                if (appliedTarget == null) continue;
-
-                Debug.Log($"[Applier] Executing hardcoded turn off on: {appliedTarget.name}");
-
-                ExecuteHardcodedTurnOff(appliedTarget);
-
-                TextObjectManager.Instance.AddApplyTarget(newTextObject, appliedTarget);
-
-                var handler = appliedTarget.GetComponent<TextNotificationHandler>();
-                if (handler != null)
-                {
-                    handler.RefreshNotifications();
-                }
-            }
-        }
-
-        AttachToSpatialAnchor(textRoot);
-        ExitApplyModeCommon();
-
-        Debug.Log("[Applier] Apply Completed");
+        var updater = ball.AddComponent<BallLineUpdater>();
+        updater.Init(lr, lineTarget);
     }
-
-
 
     void ExitApplyModeCommon()
     {
@@ -346,6 +251,31 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
         disabledRaycasters.Clear();
     }
 
+    async void AttachToSpatialAnchor(GameObject obj)
+    {
+        if (anchorManager == null)
+        {
+            Debug.LogWarning($"[Applier] ARAnchorManager not found, cannot anchor {obj.name}");
+            return;
+        }
+
+        var pose = new Pose(obj.transform.position, obj.transform.rotation);
+        var result = await anchorManager.TryAddAnchorAsync(pose);
+
+        if (result.status.IsSuccess())
+        {
+            var anchor = result.value;
+            obj.transform.SetParent(anchor.transform, true);
+            obj.transform.localPosition = Vector3.zero;
+            obj.transform.localRotation = Quaternion.identity;
+            Debug.Log($"[Applier] {obj.name} anchored at {anchor.transform.position}");
+        }
+        else
+        {
+            Debug.LogWarning($"[Applier] Failed to create anchor for {obj.name}: {result.status}");
+        }
+    }
+
     private IEnumerator BounceTextObject(GameObject obj, float scaleFactor, int times, float duration)
     {
         Vector3 originalScale = obj.transform.localScale;
@@ -370,133 +300,5 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
         }
 
         obj.transform.localScale = originalScale;
-    }
-
-    void ApplyCanvasColor(GameObject textObj)
-    {
-        // 找到 Plane
-        Transform plane = textObj.transform.Find("Plane");
-        if (plane == null)
-        {
-            Debug.LogWarning("[Applier] Plane not found under textObj");
-            return;
-        }
-
-        Transform canvas = plane.Find("Canvas");
-        if (canvas == null)
-        {
-            Debug.LogWarning("[Applier] Canvas not found under Plane");
-            return;
-        }
-
-        UnityEngine.UI.Image[] images = canvas.GetComponentsInChildren<UnityEngine.UI.Image>(true);
-        foreach (var img in images)
-        {
-            img.color = appliedCavans;
-        }
-
-        Debug.Log("[Applier] Canvas Image color applied!");
-    }
-
-    void ApplyUIColor(GameObject textObj)
-    {
-        Transform plane = textObj.transform.Find("Plane");
-        if (plane == null) return;
-
-        Transform canvas = plane.Find("Input Field World Keyboard");
-        if (canvas == null)
-        {
-            Debug.LogWarning("[Applier] Canvas not found");
-            return;
-        }
-
-        var images = canvas.GetComponentsInChildren<UnityEngine.UI.Image>(true);
-        foreach (var img in images)
-        {
-            img.color = appliedUIColor;
-        }
-    }
-
-
-    void ApplyTMPColor(GameObject textObj)
-    {
-        Transform plane = textObj.transform.Find("Plane");
-        if (plane == null) return;
-
-        Transform inputField = plane.Find("Input Field World Keyboard/InputField (TMP)");
-        if (inputField == null)
-        {
-            Debug.LogWarning("[Applier] TMP InputField not found");
-            return;
-        }
-
-        var input = inputField.GetComponent<TMPro.TMP_InputField>();
-        if (input != null)
-        {
-            if (input.textComponent != null)
-                input.textComponent.color = appliedTextColor;
-
-            if (input.placeholder is TMPro.TMP_Text placeholder)
-                placeholder.color = appliedTextColor * 0.5f;
-        }
-
-        var texts = inputField.GetComponentsInChildren<TMPro.TMP_Text>(true);
-        foreach (var t in texts)
-        {
-            t.color = appliedTextColor;
-        }
-    }
-
-    void ApplyVisualState(GameObject textObj)
-    {
-        ApplyCanvasColor(textObj);
-        ApplyUIColor(textObj);
-        ApplyTMPColor(textObj);
-    }
-
-    private void ExecuteHardcodedTurnOff(GameObject target)
-    {
-        var handlers = target.GetComponents<IActionHandler>();
-        var context = new ExecutionContext(target);
-
-        foreach (var handler in handlers)
-        {
-            string actionType = null;
-
-            if (handler is LightHandler)
-                actionType = "light.off";
-            else if (handler is MusicPlayerHandler)
-                actionType = "switch.off";
-
-            if (actionType == null) continue;
-
-            var result = handler.Execute(actionType, "{}", context);
-            Debug.Log($"[Applier] [T2T] {actionType} on '{target.name}' → success={result.success}");
-        }
-    }
-
-    async void AttachToSpatialAnchor(GameObject obj)
-    {
-        if (anchorManager == null)
-        {
-            Debug.LogWarning($"[Applier] ARAnchorManager not found, cannot anchor {obj.name}");
-            return;
-        }
-
-        var pose = new Pose(obj.transform.position, obj.transform.rotation);
-        var result = await anchorManager.TryAddAnchorAsync(pose);
-
-        if (result.status.IsSuccess())
-        {
-            var anchor = result.value;
-            obj.transform.SetParent(anchor.transform, true);
-            obj.transform.localPosition = Vector3.zero;
-            obj.transform.localRotation = Quaternion.identity;
-            Debug.Log($"[Applier] {obj.name} anchored at {anchor.transform.position}");
-        }
-        else
-        {
-            Debug.LogWarning($"[Applier] Failed to create anchor for {obj.name}: {result.status}");
-        }
     }
 }
