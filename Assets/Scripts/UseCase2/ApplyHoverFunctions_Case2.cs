@@ -12,7 +12,8 @@ public class ApplyHoverFunctions_Case2 : MonoBehaviour
 
     void Awake()
     {
-        outline = gameObject.AddComponent<Outline>();
+        outline = GetComponent<Outline>() ?? gameObject.AddComponent<Outline>();
+        if (outline == null) return;
         outline.enabled = false;
         outline.OutlineMode = Outline.Mode.OutlineAll;
         outline.OutlineColor = outlineColor;
@@ -25,13 +26,13 @@ public class ApplyHoverFunctions_Case2 : MonoBehaviour
 
         if (applier == null)
         {
-            Debug.Log("[ApplyHoverFunctions] No active Applier → ignore hover");
+            // Debug.Log("[ApplyHoverFunctions] No active Applier → ignore hover");
             return;
         }
 
         if (!applier.IsApplyMode())
         {
-            Debug.Log("[ApplyHoverFunctions] Not in ApplyMode → ignore hover");
+            // Debug.Log("[ApplyHoverFunctions] Not in ApplyMode → ignore hover");
             return;
         }
 
@@ -39,7 +40,7 @@ public class ApplyHoverFunctions_Case2 : MonoBehaviour
 
         applier.SetCurrentTarget(gameObject);
 
-        Debug.Log($"[ApplyHoverFunctions] Hover Enter: {gameObject.name}");
+        // Debug.Log($"[ApplyHoverFunctions] Hover Enter: {gameObject.name}");
     }
 
     public void OnHoverExited(HoverExitEventArgs args)
@@ -54,10 +55,10 @@ public class ApplyHoverFunctions_Case2 : MonoBehaviour
         if (applier.GetCurrentTarget() == gameObject)
         {
             applier.SetCurrentTarget(null);
-            Debug.Log($"[ApplyHoverFunctions] Cleared current target: {gameObject.name}");
+            // Debug.Log($"[ApplyHoverFunctions] Cleared current target: {gameObject.name}");
         }
 
-        Debug.Log($"[ApplyHoverFunctions] Hover Exit: {gameObject.name}");
+        // Debug.Log($"[ApplyHoverFunctions] Hover Exit: {gameObject.name}");
     }
 
     void SetOutline(bool state)
@@ -65,7 +66,7 @@ public class ApplyHoverFunctions_Case2 : MonoBehaviour
         if (outline != null)
         {
             outline.enabled = state;
-            Debug.Log($"[ApplyHoverFunctions] Outline {(state ? "ON" : "OFF")} for {gameObject.name}");
+            // Debug.Log($"[ApplyHoverFunctions] Outline {(state ? "ON" : "OFF")} for {gameObject.name}");
         }
     }
 }

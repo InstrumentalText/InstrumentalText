@@ -106,6 +106,7 @@ public class PinchHoldSpawnText_XRI : MonoBehaviour
             Debug.Log($"[Spawn] Enter → 创建 TextObject '{newTextObject.name}'，内容='{text}'");
 
         CloseKeyboard();
+        builderModeHandler.Deactivate();
     }
 
     GameObject SpawnText()

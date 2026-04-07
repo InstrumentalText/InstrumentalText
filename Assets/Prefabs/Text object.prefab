@@ -22,7 +22,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &2614903954891911212
 Transform:
   m_ObjectHideFlags: 0
@@ -475,10 +475,12 @@ MonoBehaviour:
   pinchUpThreshold: 0.2
   textRoot: {fileID: 4706888489882814384}
   scaleFactor: 1.2
-  bounceTimes: 3
-  bounceDuration: 0.2
+  aboveTargetOffset: 0.05
+  verticalSpacing: 0.1
   dotName: Dot
   lineMaterial: {fileID: 2100000, guid: d4ad64ebc615eaf48a32b5c4c9d5eeaa, type: 2}
+  connectionLineColor: {r: 0.2735849, g: 0.2735849, b: 0.2735849, a: 1}
+  connectionLineWidth: 0.0007
   appliedCavans: {r: 1, g: 1, b: 1, a: 0.5019608}
   appliedUIColor: {r: 0.7283019, g: 0.7283019, b: 0.7283019, a: 0.73333335}
   appliedTextColor: {r: 0, g: 0, b: 0, a: 1}

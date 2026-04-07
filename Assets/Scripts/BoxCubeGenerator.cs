@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.XR.ARFoundation;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 public class BoxCubeGenerator : MonoBehaviour
 {
@@ -10,6 +12,9 @@ public class BoxCubeGenerator : MonoBehaviour
     public float triggerDownThreshold = 0.8f;
     public float triggerUpThreshold = 0.2f;
 
+    [Header("Primary Button Input")]
+    public InputActionProperty leftPrimaryButtonAction;
+
     [Header("Controller Transforms")]
     public Transform leftController;
     public Transform rightController;
@@ -18,10 +23,14 @@ public class BoxCubeGenerator : MonoBehaviour
     public GameObject cubeObject;
     public float minSize = 0.05f;
 
+    [Header("Extra Interactable Objects")]
+    public List<GameObject> extraObjects = new List<GameObject>();
+
     [Header("Debug")]
     public bool debug = true;
 
     private bool defining = false;
+    private bool leftPrimaryWasDown = false;
 
     private ARAnchorManager anchorManager;
 
@@ -44,6 +53,17 @@ public class BoxCubeGenerator : MonoBehaviour
         bool rightDown = rightValue > triggerDownThreshold;
         bool leftUp = leftValue < triggerUpThreshold;
         bool rightUp = rightValue < triggerUpThreshold;
+
+        bool leftPrimaryDown = leftPrimaryButtonAction.action.ReadValue<float>() > 0.5f;
+        if (leftPrimaryDown && !leftPrimaryWasDown)
+        {
+            SetCubeAlpha(0f);
+            SwitchExtraObjectsInteractables();
+
+            if (debug)
+                Debug.Log("[BoxCubeGenerator] 左手 Primary → Cube 透明，切换额外物体交互组件");
+        }
+        leftPrimaryWasDown = leftPrimaryDown;
 
         if (!defining)
         {
@@ -144,6 +164,28 @@ public class BoxCubeGenerator : MonoBehaviour
         {
             boxCol.center = Vector3.zero;
             boxCol.size = Vector3.one;
+        }
+    }
+
+    private void SetCubeAlpha(float alpha)
+    {
+        var rend = cubeObject.GetComponent<Renderer>();
+        if (rend == null) return;
+
+        rend.enabled = alpha > 0f;
+    }
+
+    private void SwitchExtraObjectsInteractables()
+    {
+        foreach (var obj in extraObjects)
+        {
+            if (obj == null) continue;
+
+            var grab = obj.GetComponent<XRGrabInteractable>();
+            if (grab != null) grab.enabled = false;
+
+            var simple = obj.GetComponent<XRSimpleInteractable>();
+            if (simple != null) simple.enabled = true;
         }
     }
 }

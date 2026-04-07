@@ -47,9 +47,9 @@ public class TranslatorHandler : MonoBehaviour, IActionHandler
         if (renderer == null)
             return new ActionResult { success = false, errorCode = "NO_RENDERER", message = "No Renderer found on target." };
 
+        renderer.enabled = true;
         Material mat = renderer.material;
-        Color original = mat.color;
-        mat.color = new Color(translateYellow.r, translateYellow.g, translateYellow.b, original.a);
+        mat.color = new Color(translateYellow.r, translateYellow.g, translateYellow.b, 0.4f);
 
         return new ActionResult { success = true, errorCode = "", message = "" };
     }

@@ -19,14 +19,22 @@ public class InteractionViewVisualizer : MonoBehaviour
     public float lineWidth = 0.02f;
 
     [Header("Layout")]
-    public float spawnDistance = 2f;
-    public float rootPanelSpacingX = 1.0f;
-    public float rootPanelSpacingY = 0.8f;
+    public float spawnDistance = 1.2f;
+    public float rootPanelSpacingX = 0.5f;
+    public float rootPanelSpacingY = 0.4f;
     public int maxPerRow = 4;
 
     [Header("Radius Random")]
-    public float radiusMin = 0.3f;
-    public float radiusMax = 0.7f;
+    public float radiusMin = 0.15f;
+    public float radiusMax = 0.3f;
+
+    [Header("Diagonal Layout")]
+    [Tooltip("Leaf nodes snap to 4 diagonal directions (45/135/225/315°). This controls how far each node can deviate from its sector center.")]
+    public float diagonalSectorHalfAngle = 25f;
+
+    [Header("Colors")]
+    public Color centerColor = Color.yellow;
+    public Color leafColor = Color.green;
 
     private List<GameObject> spawnedPanels = new List<GameObject>();
     private List<GameObject> spawnedLines = new List<GameObject>();
@@ -119,14 +127,17 @@ public class InteractionViewVisualizer : MonoBehaviour
 
             Vector3 centerPos = basePos + right * xOffset + up * yOffset;
 
-            GameObject centerPanel = CreateCenterPanel(pair.Key, centerPos);
+            GameObject centerPanel = CreateCenterPanel(pair.Key, centerPos, centerColor);
             spawnedPanels.Add(centerPanel);
 
             int count = pair.Value.Count;
 
             for (int i = 0; i < count; i++)
             {
-                float angle = i * Mathf.PI * 2f / count;
+                float[] sectorCenters = { 45f, 135f, 225f, 315f };
+                float sectorCenter = sectorCenters[i % sectorCenters.Length] * Mathf.Deg2Rad;
+                float deviation = Random.Range(-diagonalSectorHalfAngle, diagonalSectorHalfAngle) * Mathf.Deg2Rad;
+                float angle = sectorCenter + deviation;
                 float r = Random.Range(radiusMin, radiusMax);
 
                 Vector3 offset =
@@ -135,7 +146,7 @@ public class InteractionViewVisualizer : MonoBehaviour
 
                 Vector3 pos = centerPos + offset;
 
-                GameObject panel = CreatePromptPanel(pair.Value[i], pos);
+                GameObject panel = CreatePromptPanel(pair.Value[i], pos, leafColor);
                 spawnedPanels.Add(panel);
 
                 ConnectDots(panel, centerPanel);
@@ -192,30 +203,52 @@ public class InteractionViewVisualizer : MonoBehaviour
         return cam.position + cam.forward * spawnDistance;
     }
 
-    GameObject CreateCenterPanel(string text, Vector3 pos)
+    GameObject CreateCenterPanel(string text, Vector3 pos, Color color)
     {
         GameObject panel = Instantiate(panelPrefab, pos, Quaternion.identity);
         panel.transform.forward = Camera.main.transform.forward;
+        panel.transform.localScale *= 0.6f;
 
         TMP_Text t = panel.GetComponentInChildren<TMP_Text>();
         if (t != null) t.text = text;
 
+        ApplyPanelColor(panel, color);
         return panel;
     }
 
-    GameObject CreatePromptPanel(string prompt, Vector3 pos)
+    GameObject CreatePromptPanel(string prompt, Vector3 pos, Color color)
     {
         GameObject panel = Instantiate(panelPrefab, pos, Quaternion.identity);
         panel.transform.forward = Camera.main.transform.forward;
+        panel.transform.localScale *= 0.6f;
 
         TMP_Text t = panel.GetComponentInChildren<TMP_Text>();
         if (t != null) t.text = prompt;
 
+        ApplyPanelColor(panel, color);
         return panel;
+    }
+
+    void ApplyPanelColor(GameObject panel, Color color)
+    {
+        var image = panel.GetComponentInChildren<UnityEngine.UI.Image>();
+        if (image != null)
+            image.color = color;
+
+        var planeTransform = panel.transform.Find("Plane");
+        if (planeTransform != null)
+        {
+            var rend = planeTransform.GetComponent<Renderer>();
+            if (rend != null)
+                rend.material.color = color;
+        }
     }
 
     void HideAllTextObjects()
     {
+        foreach (var applier in FindObjectsOfType<GazePinchPromptApplierOnDevice_Case2>())
+            applier.SetConnectionLinesVisible(false);
+
         foreach (var t in FindObjectsOfType<CurrentTextStore>())
             t.gameObject.SetActive(false);
     }
@@ -224,6 +257,9 @@ public class InteractionViewVisualizer : MonoBehaviour
     {
         foreach (var t in FindObjectsOfType<CurrentTextStore>())
             t.gameObject.SetActive(true);
+
+        foreach (var applier in FindObjectsOfType<GazePinchPromptApplierOnDevice_Case2>())
+            applier.SetConnectionLinesVisible(true);
     }
 
     void ClearView()

@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.XR.ARFoundation;
-using System.Collections;
 using System.Collections.Generic;
 
 [RequireComponent(typeof(Collider))]
@@ -20,32 +19,40 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
 
     [Header("ApplyMode Animation")]
     public float scaleFactor = 1.2f;
-    public int bounceTimes = 3;
-    public float bounceDuration = 0.2f;
+
+    [Header("Apply Position")]
+    public float aboveTargetOffset = 0.3f;
+    public float verticalSpacing = 0.2f;
 
     [Header("Dot Connection")]
     public string dotName = "Dot";
 
     public Material lineMaterial;
 
+    [Header("Multi-Target Connection")]
+    public Color connectionLineColor = Color.white;
+    public float connectionLineWidth = 0.02f;
+
 
     [Header("Apply Visual (Per TextObject)")]
 
-    public Color appliedCavans = Color.red; 
+    public Color appliedCavans = Color.red;
     public Color appliedUIColor = Color.green; // UI Image 颜色
     public Color appliedTextColor = Color.black; // TMP 文本颜色
-
 
     private bool applyMode = false;
     private bool pinchActive = false;
     private float pinchTimer = 0f;
+    private Vector3 originalTextRootScale;
 
     private LLMProcessorOnDevice_Case2 llmProcessor;
     private Camera mainCamera;
 
     private GameObject currentTarget = null;
 
-    private List<GameObject> spawnedLines = new List<GameObject>();
+    private List<GameObject> appliedTargets = new List<GameObject>();
+    private List<GameObject> connectionLineObjects = new List<GameObject>();
+    private bool hasBeenApplied = false;
 
     private List<GazePinchPromptApplierOnDevice_Case2> disabledAppliers = new List<GazePinchPromptApplierOnDevice_Case2>();
 
@@ -124,7 +131,10 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
         DisableAllRaycasters();
 
         if (textRoot != null)
-            StartCoroutine(BounceTextObject(textRoot, scaleFactor, bounceTimes, bounceDuration));
+        {
+            originalTextRootScale = textRoot.transform.localScale;
+            textRoot.transform.localScale = originalTextRootScale * scaleFactor;
+        }
     }
 
     void ExitApplyModeWithoutApply()
@@ -160,10 +170,22 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
 
             string prompt = textStore.CurrentText;
             Debug.Log($"[Applier] Applying '{prompt}' to {target.name} (normal object)");
+
             llmProcessor.ProcessPrompt(target, prompt);
-            TextObjectManager.Instance.AddApplyTarget(textRoot, target);
-            //添加apply后的UI调整
-            ApplyVisualState(textRoot);
+
+            if (!appliedTargets.Contains(target))
+            {
+                appliedTargets.Add(target);
+                TextObjectManager.Instance.AddApplyTarget(textRoot, target);
+            }
+
+            if (!hasBeenApplied)
+            {
+                hasBeenApplied = true;
+                ApplyVisualState(textRoot);
+            }
+
+            PositionTextAtCentroid();
         }
         else
         {
@@ -192,7 +214,6 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
             {
                 Debug.Log("[Applier] No previously registered apply objects for this TextObject root: " + originalRoot.name);
             }
-
 
             GameObject newTextObject = Instantiate(textRoot);
 
@@ -245,10 +266,9 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
 
                 var handler = appliedTarget.GetComponent<TextNotificationHandler>();
                 if (handler != null)
-                {
                     handler.RefreshNotifications();
-                }
             }
+
         }
 
         AttachToSpatialAnchor(textRoot);
@@ -269,6 +289,9 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
 
         currentTarget = null;
 
+        if (textRoot != null)
+            textRoot.transform.localScale = originalTextRootScale;
+
         RestoreOtherTextObjectAppliers();
         RestoreAllRaycasters();
     }
@@ -276,6 +299,22 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
     public void SetCurrentTarget(GameObject target) => currentTarget = target;
     public GameObject GetCurrentTarget() => currentTarget;
     public bool IsApplyMode() => applyMode;
+
+    public void SetConnectionLinesVisible(bool visible)
+    {
+        foreach (var obj in connectionLineObjects)
+            if (obj != null) obj.SetActive(visible);
+    }
+
+    public void ForceEnterApplyMode()
+    {
+        EnterApplyMode();
+    }
+
+    public void ForceExitApplyMode()
+    {
+        ExitApplyModeCommon();
+    }
 
     void DisableOtherTextObjectAppliers()
     {
@@ -346,30 +385,94 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
         disabledRaycasters.Clear();
     }
 
-    private IEnumerator BounceTextObject(GameObject obj, float scaleFactor, int times, float duration)
+    void PositionTextAtCentroid()
     {
-        Vector3 originalScale = obj.transform.localScale;
+        if (appliedTargets.Count == 0) return;
 
-        for (int i = 0; i < times; i++)
+        Vector3 centroid = Vector3.zero;
+        float maxTopY = float.MinValue;
+
+        foreach (var t in appliedTargets)
         {
-            float timer = 0f;
-            while (timer < duration)
-            {
-                obj.transform.localScale = Vector3.Lerp(originalScale, originalScale * scaleFactor, timer / duration);
-                timer += Time.deltaTime;
-                yield return null;
-            }
-
-            timer = 0f;
-            while (timer < duration)
-            {
-                obj.transform.localScale = Vector3.Lerp(originalScale * scaleFactor, originalScale, timer / duration);
-                timer += Time.deltaTime;
-                yield return null;
-            }
+            if (t == null) continue;
+            centroid += t.transform.position;
+            Collider col = t.GetComponentInChildren<Collider>();
+            float topY = col != null ? col.bounds.max.y : t.transform.position.y;
+            if (topY > maxTopY) maxTopY = topY;
         }
 
-        obj.transform.localScale = originalScale;
+        centroid /= appliedTargets.Count;
+
+        Vector3 toCamera = mainCamera.transform.position - centroid;
+        toCamera.y = 0f;
+        Quaternion rot = toCamera.sqrMagnitude > 0.001f
+            ? Quaternion.LookRotation(toCamera.normalized) * Quaternion.Euler(0, 180, 0)
+            : textRoot.transform.rotation;
+
+        // Stack all texts that share the exact same target set vertically
+        List<GameObject> colocated = GetColocatedTexts();
+        for (int i = 0; i < colocated.Count; i++)
+        {
+            if (colocated[i] == null) continue;
+            colocated[i].transform.SetPositionAndRotation(new Vector3(centroid.x, maxTopY + aboveTargetOffset + i * verticalSpacing, centroid.z), rot);
+        }
+
+        RebuildConnectionLines();
+    }
+
+    List<GameObject> GetColocatedTexts()
+    {
+        var result = new List<GameObject>();
+        if (TextObjectManager.Instance == null) return result;
+        var allTexts = TextObjectManager.Instance.GetAllTextObjects();
+
+        foreach (var textObj in allTexts)
+        {
+            if (textObj == null) continue;
+            var targets = TextObjectManager.Instance.GetApplyTargets(textObj);
+            if (targets == null || targets.Count != appliedTargets.Count) continue;
+
+            bool match = true;
+            foreach (var t in appliedTargets)
+            {
+                if (!targets.Contains(t)) { match = false; break; }
+            }
+            if (match) result.Add(textObj);
+        }
+
+        return result;
+    }
+
+    void RebuildConnectionLines()
+    {
+        foreach (var obj in connectionLineObjects)
+            if (obj != null) Destroy(obj);
+        connectionLineObjects.Clear();
+
+        if (appliedTargets.Count < 2) return;
+
+        foreach (var target in appliedTargets)
+        {
+            if (target == null) continue;
+
+            GameObject lineObj = new GameObject("ConnectionLine");
+            LineRenderer lr = lineObj.AddComponent<LineRenderer>();
+
+            Material mat = new Material(Shader.Find("Unlit/Color"));
+            mat.color = connectionLineColor;
+            lr.material = mat;
+
+            lr.startColor = connectionLineColor;
+            lr.endColor = connectionLineColor;
+            lr.startWidth = connectionLineWidth;
+            lr.endWidth = connectionLineWidth;
+            lr.positionCount = 2;
+            lr.useWorldSpace = true;
+            lr.SetPosition(0, textRoot.transform.position);
+            lr.SetPosition(1, target.transform.position);
+
+            connectionLineObjects.Add(lineObj);
+        }
     }
 
     void ApplyCanvasColor(GameObject textObj)
