@@ -20,7 +20,7 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
     [Header("ApplyMode Animation")]
     public float scaleFactor = 1.2f;
 
-    private Vector3 originalTextScale;
+    private Vector3 originalTextRootScale;
 
     [Header("Spawn")]
     public GameObject colorMirrorPrefab;
@@ -28,8 +28,12 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
     public float lineWidth = 0.005f;
 
     private TextColorController textColorController;
-
     private int ballSpawnCount = 0;
+
+    [Header("Apply Visual (Per TextObject)")]
+    public Color appliedCavans = Color.red;
+    public Color appliedUIColor = Color.green;
+    public Color appliedTextColor = Color.black;
 
     private bool applyMode = false;
     private bool pinchActive = false;
@@ -110,9 +114,16 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
 
         if (textRoot != null)
         {
-            originalTextScale = textRoot.transform.localScale;
-            textRoot.transform.localScale = originalTextScale * scaleFactor;
+            originalTextRootScale = textRoot.transform.localScale;
+            textRoot.transform.localScale = originalTextRootScale * scaleFactor;
+            ApplyVisualState(textRoot);
         }
+    }
+
+    void ExitApplyModeWithoutApply()
+    {
+        ExitApplyModeCommon();
+        Debug.Log("[Applier] Exit Apply Mode");
     }
 
     void ReleaseHeldBall()
@@ -171,13 +182,13 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
         applyMode = false;
         pinchActive = false;
 
-        if (textRoot != null)
-            textRoot.transform.localScale = originalTextScale;
-
         if (ActiveInstance == this)
             ActiveInstance = null;
 
         currentTarget = null;
+
+        if (textRoot != null)
+            textRoot.transform.localScale = originalTextRootScale;
 
         RestoreOtherTextObjectAppliers();
         RestoreAllRaycasters();
@@ -186,6 +197,16 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
     public void SetCurrentTarget(GameObject target) => currentTarget = target;
     public GameObject GetCurrentTarget() => currentTarget;
     public bool IsApplyMode() => applyMode;
+
+    public void ForceEnterApplyMode()
+    {
+        EnterApplyMode();
+    }
+
+    public void ForceExitApplyMode()
+    {
+        ExitApplyModeCommon();
+    }
 
     void DisableOtherTextObjectAppliers()
     {
@@ -256,6 +277,86 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
         disabledRaycasters.Clear();
     }
 
+    void ApplyCanvasColor(GameObject textObj)
+    {
+        Transform plane = textObj.transform.Find("Plane");
+        if (plane == null)
+        {
+            Debug.LogWarning("[Applier] Plane not found under textObj");
+            return;
+        }
+
+        Transform canvas = plane.Find("Canvas");
+        if (canvas == null)
+        {
+            Debug.LogWarning("[Applier] Canvas not found under Plane");
+            return;
+        }
+
+        UnityEngine.UI.Image[] images = canvas.GetComponentsInChildren<UnityEngine.UI.Image>(true);
+        foreach (var img in images)
+        {
+            img.color = appliedCavans;
+        }
+
+        Debug.Log("[Applier] Canvas Image color applied!");
+    }
+
+    void ApplyUIColor(GameObject textObj)
+    {
+        Transform plane = textObj.transform.Find("Plane");
+        if (plane == null) return;
+
+        Transform canvas = plane.Find("Input Field World Keyboard");
+        if (canvas == null)
+        {
+            Debug.LogWarning("[Applier] Canvas not found");
+            return;
+        }
+
+        var images = canvas.GetComponentsInChildren<UnityEngine.UI.Image>(true);
+        foreach (var img in images)
+        {
+            img.color = appliedUIColor;
+        }
+    }
+
+    void ApplyTMPColor(GameObject textObj)
+    {
+        Transform plane = textObj.transform.Find("Plane");
+        if (plane == null) return;
+
+        Transform inputField = plane.Find("Input Field World Keyboard/InputField (TMP)");
+        if (inputField == null)
+        {
+            Debug.LogWarning("[Applier] TMP InputField not found");
+            return;
+        }
+
+        var input = inputField.GetComponent<TMPro.TMP_InputField>();
+        if (input != null)
+        {
+            if (input.textComponent != null)
+                input.textComponent.color = appliedTextColor;
+
+            if (input.placeholder is TMPro.TMP_Text placeholder)
+                placeholder.color = appliedTextColor * 0.5f;
+        }
+
+        var texts = inputField.GetComponentsInChildren<TMPro.TMP_Text>(true);
+        foreach (var t in texts)
+        {
+            t.color = appliedTextColor;
+        }
+    }
+
+    void ApplyVisualState(GameObject textObj)
+    {
+        ApplyCanvasColor(textObj);
+        ApplyUIColor(textObj);
+        ApplyTMPColor(textObj);
+    }
+
     async void AttachToSpatialAnchor(GameObject obj)
     {
         if (anchorManager == null)
@@ -280,5 +381,4 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
             Debug.LogWarning($"[Applier] Failed to create anchor for {obj.name}: {result.status}");
         }
     }
-
 }

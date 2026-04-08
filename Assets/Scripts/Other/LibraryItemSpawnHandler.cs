@@ -33,15 +33,10 @@ public class LibraryItemSpawnHandler : MonoBehaviour
     public bool debug = true;
 
     private bool pinchPressed = false;
-    private float pinchTimer = 0f;
-    private bool hasSpawned = false;
     private bool interactionActive = false;
 
     private GameObject currentTextObject = null;
-
-    private Collider[] currentColliders = null;
-    private TrackedDeviceGraphicRaycaster[] currentRaycasters = null;
-    private GazePinchPromptApplierOnDevice_Case2[] currentAppliers = null;
+    private GazePinchPromptApplierOnDevice_Case2 activeApplier = null;
 
     void Awake()
     {
@@ -63,7 +58,7 @@ public class LibraryItemSpawnHandler : MonoBehaviour
     {
         interactionActive = isOn;
 
-        ResetState();
+        if (!isOn) CancelApplyMode();
 
         if (debug)
             Debug.Log($"[LibrarySpawn] Toggle {(isOn ? "ON → 开启 Pinch 检测" : "OFF → 停止检测")}");
@@ -71,112 +66,79 @@ public class LibraryItemSpawnHandler : MonoBehaviour
 
     void Update()
     {
-        if (!interactionActive)
-            return;
+        if (!interactionActive) return;
 
         float pinchValue = pinchAction.action.ReadValue<float>();
 
         if (!pinchPressed && pinchValue > pinchDownThreshold)
         {
             pinchPressed = true;
-            pinchTimer = 0f;
-            hasSpawned = false;
-
-            ResetCurrentObjectRefs();
-
-            if (debug) Debug.Log("[LibrarySpawn] Pinch Start");
+            EnterLibraryApplyMode();
+            if (debug) Debug.Log("[LibrarySpawn] Pinch → 进入 Library Apply Mode");
         }
 
         if (pinchPressed && pinchValue < pinchUpThreshold)
         {
             pinchPressed = false;
-            pinchTimer = 0f;
+            HandlePinchRelease();
+        }
+    }
 
-            RestoreInteraction(); 
+    void EnterLibraryApplyMode()
+    {
+        string itemText = GetItemText();
+        currentTextObject = SpawnFromPrefab(itemText);
+        if (currentTextObject == null) return;
 
-            ResetCurrentObjectRefs();
-            hasSpawned = false;
+        TextObjectManager.Instance?.RegisterTextObject(currentTextObject);
 
+        activeApplier = currentTextObject.GetComponentInChildren<GazePinchPromptApplierOnDevice_Case2>(true);
+        if (activeApplier != null)
+        {
+            if (activeApplier.textRoot == null)
+                activeApplier.textRoot = currentTextObject;
+            activeApplier.ForceEnterApplyMode();
+        }
+    }
+
+    void HandlePinchRelease()
+    {
+        if (activeApplier == null)
+        {
+            currentTextObject = null;
             return;
         }
 
-        // Pinch Hold
-        if (pinchPressed)
+        var target = activeApplier.GetCurrentTarget();
+        if (target != null)
         {
-            pinchTimer += Time.deltaTime;
-
-            if (!hasSpawned && pinchTimer >= pinchHoldTime)
-            {
-                string itemText = GetItemText();
-                currentTextObject = SpawnFromPrefab(itemText);
-
-                if (currentTextObject != null)
-                {
-                    CacheAndDisableInteraction(currentTextObject); 
-
-                    if (TextObjectManager.Instance != null)
-                        TextObjectManager.Instance.RegisterTextObject(currentTextObject);
-
-                    if (debug) Debug.Log("[LibrarySpawn] 已生成 TextObject（跟随阶段）");
-                }
-
-                hasSpawned = true;
-            }
-
-            if (currentTextObject != null)
-                FollowHand(currentTextObject);
+            activeApplier.ApplyPromptToTarget(target);
+            if (debug) Debug.Log($"[LibrarySpawn] Apply 成功 → {target.name}");
         }
-    }
+        else
+        {
+            CancelApplyMode();
+            if (debug) Debug.Log("[LibrarySpawn] 无目标 → 取消");
+        }
 
-
-
-    void CacheAndDisableInteraction(GameObject obj)
-    {
-        currentAppliers = obj.GetComponentsInChildren<GazePinchPromptApplierOnDevice_Case2>(true);
-        currentColliders = obj.GetComponentsInChildren<Collider>(true);
-        currentRaycasters = obj.GetComponentsInChildren<TrackedDeviceGraphicRaycaster>(true);
-
-        foreach (var a in currentAppliers)
-            if (a != null) a.enabled = false;
-
-        foreach (var col in currentColliders)
-            if (col != null) col.enabled = false;
-
-        foreach (var ray in currentRaycasters)
-            if (ray != null) ray.enabled = false;
-    }
-
-
-    void RestoreInteraction()
-    {
-        if (currentTextObject == null) return;
-
-        foreach (var a in currentAppliers)
-            if (a != null) a.enabled = true;
-
-        foreach (var col in currentColliders)
-            if (col != null) col.enabled = true;
-
-        foreach (var ray in currentRaycasters)
-            if (ray != null) ray.enabled = true;
-
-        if (debug) Debug.Log($"[LibrarySpawn] Pinch Release → 完整恢复 {currentTextObject.name}");
-    }
-
-    void ResetCurrentObjectRefs()
-    {
+        activeApplier = null;
         currentTextObject = null;
-        currentColliders = null;
-        currentRaycasters = null;
-        currentAppliers = null;
     }
 
-    void ResetState()
+    void CancelApplyMode()
     {
+        if (activeApplier != null)
+            activeApplier.ForceExitApplyMode();
+
+        if (currentTextObject != null)
+        {
+            TextObjectManager.Instance?.UnregisterTextObject(currentTextObject);
+            Destroy(currentTextObject);
+            currentTextObject = null;
+        }
+
+        activeApplier = null;
         pinchPressed = false;
-        pinchTimer = 0f;
-        hasSpawned = false;
-        ResetCurrentObjectRefs();
     }
 
     string GetItemText()
@@ -227,15 +189,4 @@ public class LibraryItemSpawnHandler : MonoBehaviour
         return newObj;
     }
 
-    void FollowHand(GameObject obj)
-    {
-        Camera cam = Camera.main;
-        if (cam == null || obj == null) return;
-
-        Vector3 targetPos = cam.transform.position + cam.transform.forward * spawnDistance;
-        targetPos += localOffset;
-
-        obj.transform.position = targetPos;
-        obj.transform.rotation = Quaternion.LookRotation(cam.transform.forward);
-    }
 }

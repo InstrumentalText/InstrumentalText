@@ -68,12 +68,14 @@ public class SearchModeHandler : MonoBehaviour
 
                 // 搜索模式 → 启用 DotFollower
                 SetDotFollowersActive(true);
+                SetConnectionLinesVisible(true);
 
                 if (debug)
                     Debug.Log("[SearchModeHandler] 显示 TextObject + 启用 DotFollower");
             }
             else
             {
+                SetConnectionLinesVisible(false);
                 TextObjectManager.Instance.HideAll();
 
                 // 退出搜索模式 → 禁用 DotFollower
@@ -95,6 +97,12 @@ public class SearchModeHandler : MonoBehaviour
                 }
             }
         }
+    }
+
+    private void SetConnectionLinesVisible(bool visible)
+    {
+        foreach (var applier in FindObjectsOfType<GazePinchPromptApplierOnDevice_Case2>())
+            applier.SetConnectionLinesVisible(visible);
     }
 
     private void SetDotFollowersActive(bool active)

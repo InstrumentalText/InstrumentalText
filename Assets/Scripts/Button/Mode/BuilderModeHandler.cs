@@ -44,6 +44,12 @@ public class BuilderModeHandler : MonoBehaviour
         return isBuilderActive;
     }
 
+    public void Deactivate()
+    {
+        if (targetButton != null && targetButton.group != null)
+            targetButton.group.OnButtonClicked(targetButton);
+    }
+
 
     private void Update()
     {
