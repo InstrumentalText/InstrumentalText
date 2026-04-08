@@ -475,7 +475,7 @@ MonoBehaviour:
   pinchUpThreshold: 0.2
   textRoot: {fileID: 4706888489882814384}
   scaleFactor: 1.2
-  aboveTargetOffset: 0.05
+  aboveTargetOffset: 0.1
   verticalSpacing: 0.1
   dotName: Dot
   lineMaterial: {fileID: 2100000, guid: d4ad64ebc615eaf48a32b5c4c9d5eeaa, type: 2}
@@ -597,6 +597,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ApplyHoverFunctions_Case2
   outlineColor: {r: 0.015686274, g: 0.86910236, b: 1, a: 1}
   outlineWidth: 20
+  gazeInteractor: {fileID: 0}
 --- !u!65 &1664094972958187158
 BoxCollider:
   m_ObjectHideFlags: 0
