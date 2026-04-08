@@ -49,6 +49,17 @@ public class LightHandler : MonoBehaviour, IActionHandler
         },
         new ActionSpec
         {
+            type = "light.energise",
+            summary = "Energise the light — boost brightness",
+            description = "Boost the light's intensity by a fixed amount. Use this action for any prompt that contains or implies 'energise'.",
+            args = new List<ArgSpec>(),
+            examples = new List<string>
+            {
+                "{\"type\":\"light.energise\",\"args\":{}}"
+            }
+        },
+        new ActionSpec
+        {
             type = "light.intensity",
             summary = "Adjust light intensity",
             description = "Set or offset the light intensity value.",
@@ -96,7 +107,7 @@ public class LightHandler : MonoBehaviour, IActionHandler
 
     public bool CanHandle(string actionType)
     {
-        return actionType == "light.on" || actionType == "light.off" || actionType == "light.toggle" || actionType == "light.intensity";
+        return actionType == "light.on" || actionType == "light.off" || actionType == "light.toggle" || actionType == "light.intensity" || actionType == "light.energise";
     }
 
     public ActionResult Execute(string actionType, string argsJson, ExecutionContext target)
@@ -120,6 +131,8 @@ public class LightHandler : MonoBehaviour, IActionHandler
                 return HandleLightToggle();
             case "light.intensity":
                 return HandleLightIntensity(argsObj);
+            case "light.energise":
+                return HandleLightEnergise();
             default:
                 return new ActionResult{success = false, errorCode = "UNKNOWN_ACTION", message = $"Unsupported action: {actionType}"};
         }
@@ -186,6 +199,17 @@ public class LightHandler : MonoBehaviour, IActionHandler
             lightComponent.intensity = newIntensity;
         }
 
+        UpdateBulbEmission();
+        return new ActionResult{success = true, errorCode = "", message = ""};
+    }
+
+    private ActionResult HandleLightEnergise()
+    {
+        if (lightComponent == null)
+            return new ActionResult{success = false, errorCode = "NO_LIGHT", message = "Light component not found."};
+
+        lightComponent.enabled = true;
+        lightComponent.intensity += 0.3f;
         UpdateBulbEmission();
         return new ActionResult{success = true, errorCode = "", message = ""};
     }
