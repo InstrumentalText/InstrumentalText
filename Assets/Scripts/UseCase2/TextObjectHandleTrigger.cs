@@ -17,6 +17,8 @@ public class TextObjectHandleTrigger : MonoBehaviour
 
     private void Awake()
     {
+        if (!gameObject.activeInHierarchy || !enabled) return;
+
         if (grabInteractable == null) Debug.LogError($"{gameObject.name} 缺少 XRGrabInteractable，请在 Inspector 拖入");
         if (rend == null) Debug.LogError($"{gameObject.name} 缺少 Renderer，请在 Inspector 拖入");
         if (currentTextStore == null) Debug.LogError($"{gameObject.name} 缺少 CurrentTextStore，请在 Inspector 拖入");

@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.XR.ARFoundation;
-using System.Collections;
 using System.Collections.Generic;
 
 [RequireComponent(typeof(Collider))]
@@ -20,8 +19,8 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
 
     [Header("ApplyMode Animation")]
     public float scaleFactor = 1.2f;
-    public int bounceTimes = 3;
-    public float bounceDuration = 0.2f;
+
+    private Vector3 originalTextScale;
 
     [Header("Spawn")]
     public GameObject colorMirrorPrefab;
@@ -110,7 +109,10 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
         DisableAllRaycasters();
 
         if (textRoot != null)
-            StartCoroutine(BounceTextObject(textRoot, scaleFactor, bounceTimes, bounceDuration));
+        {
+            originalTextScale = textRoot.transform.localScale;
+            textRoot.transform.localScale = originalTextScale * scaleFactor;
+        }
     }
 
     void ReleaseHeldBall()
@@ -168,6 +170,9 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
     {
         applyMode = false;
         pinchActive = false;
+
+        if (textRoot != null)
+            textRoot.transform.localScale = originalTextScale;
 
         if (ActiveInstance == this)
             ActiveInstance = null;
@@ -276,29 +281,4 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
         }
     }
 
-    private IEnumerator BounceTextObject(GameObject obj, float scaleFactor, int times, float duration)
-    {
-        Vector3 originalScale = obj.transform.localScale;
-
-        for (int i = 0; i < times; i++)
-        {
-            float timer = 0f;
-            while (timer < duration)
-            {
-                obj.transform.localScale = Vector3.Lerp(originalScale, originalScale * scaleFactor, timer / duration);
-                timer += Time.deltaTime;
-                yield return null;
-            }
-
-            timer = 0f;
-            while (timer < duration)
-            {
-                obj.transform.localScale = Vector3.Lerp(originalScale * scaleFactor, originalScale, timer / duration);
-                timer += Time.deltaTime;
-                yield return null;
-            }
-        }
-
-        obj.transform.localScale = originalScale;
-    }
 }
