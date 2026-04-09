@@ -101,8 +101,8 @@ public class SearchModeHandler : MonoBehaviour
 
     private void SetConnectionLinesVisible(bool visible)
     {
-        foreach (var applier in FindObjectsOfType<GazePinchPromptApplierOnDevice_Case2>())
-            applier.SetConnectionLinesVisible(visible);
+        // foreach (var applier in FindObjectsOfType<GazePinchPromptApplierOnDevice_Case2>())
+        //     applier.SetConnectionLinesVisible(visible);
     }
 
     private void SetDotFollowersActive(bool active)

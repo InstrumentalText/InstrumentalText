@@ -2,8 +2,6 @@ using UnityEngine;
 
 public class BallLineUpdater : MonoBehaviour
 {
-    public float tilingPerUnit = 50f;
-
     private LineRenderer lr;
     private Transform target;
 
@@ -19,8 +17,5 @@ public class BallLineUpdater : MonoBehaviour
 
         lr.SetPosition(0, transform.position);
         lr.SetPosition(1, target.position);
-
-        float length = Vector3.Distance(transform.position, target.position);
-        lr.material.mainTextureScale = new Vector2(length * tilingPerUnit, 1f);
     }
 }

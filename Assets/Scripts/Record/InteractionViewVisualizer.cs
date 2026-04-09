@@ -246,9 +246,6 @@ public class InteractionViewVisualizer : MonoBehaviour
 
     void HideAllTextObjects()
     {
-        foreach (var applier in FindObjectsOfType<GazePinchPromptApplierOnDevice_Case2>())
-            applier.SetConnectionLinesVisible(false);
-
         foreach (var t in FindObjectsOfType<CurrentTextStore>())
             t.gameObject.SetActive(false);
     }
@@ -257,9 +254,6 @@ public class InteractionViewVisualizer : MonoBehaviour
     {
         foreach (var t in FindObjectsOfType<CurrentTextStore>())
             t.gameObject.SetActive(true);
-
-        foreach (var applier in FindObjectsOfType<GazePinchPromptApplierOnDevice_Case2>())
-            applier.SetConnectionLinesVisible(true);
     }
 
     void ClearView()

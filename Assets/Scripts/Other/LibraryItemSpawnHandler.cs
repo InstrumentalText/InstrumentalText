@@ -112,7 +112,7 @@ public class LibraryItemSpawnHandler : MonoBehaviour
         var target = activeApplier.GetCurrentTarget();
         if (target != null)
         {
-            activeApplier.ApplyPromptToTarget(target);
+            // activeApplier.ApplyPromptToTarget(target);
             if (debug) Debug.Log($"[LibrarySpawn] Apply 成功 → {target.name}");
         }
         else

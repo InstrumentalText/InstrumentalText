@@ -475,12 +475,9 @@ MonoBehaviour:
   pinchUpThreshold: 0.2
   textRoot: {fileID: 4706888489882814384}
   scaleFactor: 1.2
-  aboveTargetOffset: 0.1
-  verticalSpacing: 0.1
-  dotName: Dot
+  colorMirrorPrefab: {fileID: 5483715399779465778, guid: ce99c0265275495458aeaeb02fccdd28, type: 3}
   lineMaterial: {fileID: 2100000, guid: d4ad64ebc615eaf48a32b5c4c9d5eeaa, type: 2}
-  connectionLineColor: {r: 0.2735849, g: 0.2735849, b: 0.2735849, a: 1}
-  connectionLineWidth: 0.0007
+  lineWidth: 0.001
   appliedCavans: {r: 1, g: 1, b: 1, a: 0.5019608}
   appliedUIColor: {r: 0.7283019, g: 0.7283019, b: 0.7283019, a: 0.73333335}
   appliedTextColor: {r: 0, g: 0, b: 0, a: 1}
@@ -597,7 +594,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ApplyHoverFunctions_Case2
   outlineColor: {r: 0.015686274, g: 0.86910236, b: 1, a: 1}
   outlineWidth: 20
-  gazeInteractor: {fileID: 0}
 --- !u!65 &1664094972958187158
 BoxCollider:
   m_ObjectHideFlags: 0

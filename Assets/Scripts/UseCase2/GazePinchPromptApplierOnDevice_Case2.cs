@@ -151,8 +151,6 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
         ballSpawnCount++;
         if (ballSpawnCount == 2 && textColorController != null)
             textColorController.ActivateText1();
-        else if (ballSpawnCount == 4 && textColorController != null)
-            textColorController.ActivateText2();
     }
 
     void ConnectLineToTextRoot(GameObject ball)
@@ -165,10 +163,7 @@ public class GazePinchPromptApplierOnDevice_Case2 : MonoBehaviour
         lr.endWidth = lineWidth;
         lr.useWorldSpace = true;
 
-        if (lineMaterial != null)
-            lr.material = lineMaterial;
-        else
-            lr.material = new Material(Shader.Find("Sprites/Default"));
+        lr.material = new Material(Shader.Find("Universal Render Pipeline/Unlit")) { color = Color.white };
 
         Transform plane = textRoot.transform.Find("Plane");
         Transform lineTarget = plane != null ? plane : textRoot.transform;
